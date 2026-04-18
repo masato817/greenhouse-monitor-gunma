@@ -9,6 +9,19 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <meta http-equiv="refresh" content="300">
+    <script>
+        (function () {
+            try {
+                var KEY = 'greenhouse-dashboard-farm';
+                var lastSeg = location.pathname.split('/').filter(Boolean).pop() || '';
+                var onIndex = lastSeg !== 'gunma.html';
+                var last = localStorage.getItem(KEY);
+                if (onIndex && last === 'gunma') {
+                    location.replace('gunma.html' + location.search + location.hash);
+                }
+            } catch (e) { /* noop */ }
+        })();
+    </script>
 </head>
 
 <body class="bg-gray-100 font-sans">
@@ -17,7 +30,8 @@
             <div class="flex justify-between items-end pb-1">
                 <div class="flex items-center gap-3">
                     <p class="text-xs text-gray-600 font-mono">最終 26/04/18 13:17</p>
-                    <a href="./index.html" class="text-xs text-blue-600 hover:underline">▶ 静岡</a>
+                    <a href="./index.html" class="text-xs text-blue-600 hover:underline"
+                        onclick="try{localStorage.setItem('greenhouse-dashboard-farm','shizuoka');}catch(e){}">▶ 静岡</a>
                 </div>
 
                 <!-- Metrics (Compact, Right aligned) -->
@@ -72,6 +86,12 @@
                         <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">9.0</td>
                         <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs font-bold text-center">
                             16.1</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">☀️ 日射(W)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">183.0</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">371.0</td>
                     </tr>
                     <tr>
                         <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">☀️ 前日積算(MJ)
@@ -130,12 +150,6 @@
                         <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-center text-blue-900"
                             >
                             383</td>
-                    </tr>
-                    <tr>
-                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">☀️ 日射(W)
-                        </td>
-                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">183.0</td>
-                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">371.0</td>
                     </tr>
                     <tr>
                         <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">📊 24H平均(℃)
@@ -253,6 +267,11 @@
         <!-- 異常検知履歴 -->
 
     </div>
+    <script>
+        try {
+            localStorage.setItem('greenhouse-dashboard-farm', 'gunma');
+        } catch (e) { /* noop */ }
+    </script>
 </body>
 
 </html>

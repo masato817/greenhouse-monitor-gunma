@@ -9,6 +9,19 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <meta http-equiv="refresh" content="{{refreshInterval}}">
+    <script>
+        (function () {
+            try {
+                var KEY = 'greenhouse-dashboard-farm';
+                var lastSeg = location.pathname.split('/').filter(Boolean).pop() || '';
+                var onIndex = lastSeg !== 'gunma.html';
+                var last = localStorage.getItem(KEY);
+                if (onIndex && last === 'gunma') {
+                    location.replace('gunma.html' + location.search + location.hash);
+                }
+            } catch (e) { /* noop */ }
+        })();
+    </script>
 </head>
 
 <body class="bg-gray-100 font-sans">
@@ -18,7 +31,8 @@
             <div class="flex justify-between items-end pb-1">
                 <div class="flex items-center gap-3">
                     <p class="text-xs text-gray-600 font-mono">最終 {{updatedAt}}</p>
-                    <a href="./gunma.html" class="text-xs text-blue-600 hover:underline">▶ 群馬</a>
+                    <a href="./gunma.html" class="text-xs text-blue-600 hover:underline"
+                        onclick="try{localStorage.setItem('greenhouse-dashboard-farm','gunma');}catch(e){}">▶ 群馬</a>
                 </div>
 
                 <!-- Metrics (Compact, Right aligned) -->
@@ -94,6 +108,18 @@
                             houses.house3.accumulatedSolarRadiation}}</td>
                         <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
                             houses.house4.accumulatedSolarRadiation}}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">☀️ 日射(W)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house1.solarRadiation}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house2.solarRadiation}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house3.solarRadiation}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house4.solarRadiation}}</td>
                     </tr>
                     <tr>
                         <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">💡 LED累積(MJ)
@@ -238,19 +264,6 @@
                             {{#if isAbnormal}}style="color: red; font-weight: bold;" {{/if}}>
                             {{formatInt value}}</td>
                         {{/with}}
-                    </tr>
-
-                    <tr>
-                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">☀️ 日射(W)
-                        </td>
-                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
-                            houses.house1.solarRadiation}}</td>
-                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
-                            houses.house2.solarRadiation}}</td>
-                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
-                            houses.house3.solarRadiation}}</td>
-                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
-                            houses.house4.solarRadiation}}</td>
                     </tr>
                     <tr>
                         <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">📊 24H平均(℃)
@@ -521,6 +534,11 @@
         {{/if}}
 
     </div>
+    <script>
+        try {
+            localStorage.setItem('greenhouse-dashboard-farm', 'shizuoka');
+        } catch (e) { /* noop */ }
+    </script>
 </body>
 
 </html>
