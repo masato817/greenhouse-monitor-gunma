@@ -151,12 +151,8 @@ export class GunmaDashboardGenerator {
             // 潅水目安計算
             // - 基準ハウス: 8号（外日射）の積算日射で評価
             // - 日の出・日の入: 8号
-            // - LED: 8号 の照明設定
-            const refConfig = {
-                start: houses.house8?.lightingStartTime,
-                end: houses.house8?.lightingEndTime,
-            };
-            const wateringGuide = this.calculateWateringGuide(houses.house8, historyList, refConfig);
+            // - 群馬はLED未導入のため LED加算なし (lightingConfig=null)
+            const wateringGuide = this.calculateWateringGuide(houses.house8, historyList, null);
 
             // 潅水目安をスプシ保存 (群馬_潅水目安履歴)
             if (wateringGuide && wateringGuide.times && wateringGuide.times.length > 0) {
