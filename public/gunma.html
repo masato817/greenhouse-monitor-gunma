@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>群馬農場 環境モニター</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <meta http-equiv="refresh" content="300">
+</head>
+
+<body class="bg-gray-100 font-sans">
+    <div class="container mx-auto p-4">
+        <header class="mb-1">
+            <div class="flex justify-between items-end pb-1">
+                <div class="flex items-center gap-3">
+                    <p class="text-xs text-gray-600 font-mono">最終 26/04/18 13:17</p>
+                    <a href="./index.html" class="text-xs text-blue-600 hover:underline">▶ 静岡</a>
+                </div>
+
+                <!-- Metrics (Compact, Right aligned) -->
+                <div class="flex gap-3 text-sm items-center">
+                    <!-- Accumulated Solar (8号 基準) -->
+                    <div>
+                        <span class="font-bold text-blue-900">16.1<span
+                                class="text-xs font-normal text-gray-500">MJ</span></span>
+                    </div>
+                    <!-- Outside Temp -->
+                    <div>
+                        <span class="font-bold text-blue-900">-<span
+                                class="text-xs font-normal text-gray-500">℃</span></span>
+                    </div>
+                    <!-- Wind Speed -->
+                    <div class="flex items-center gap-1">
+                        <span class="font-bold text-blue-900">-<span
+                                class="text-xs font-normal text-gray-500">m/s</span></span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- アラートセクション -->
+        <div id="alerts" class="mb-6 hidden"></div>
+
+        <!-- データテーブル -->
+        <div class="overflow-x-auto bg-white rounded-lg shadow mb-2">
+            <table class="min-w-full leading-normal">
+                <thead>
+                    <tr>
+                        <th
+                            class="px-1 py-2 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-1/3">
+                            項目
+                        </th>
+                        <th
+                            class="px-1 py-2 border-b-2 border-gray-200 bg-gray-100 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider w-1/3">
+                            <a href="https://profindercloud.seiwa-ecosys.jp/Profinder" target="_blank"
+                                class="hover:underline text-blue-600">9号</a>
+                        </th>
+                        <th
+                            class="px-1 py-2 border-b-2 border-gray-200 bg-gray-100 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider w-1/3">
+                            <a href="https://profindercloud.seiwa-ecosys.jp/Profinder" target="_blank"
+                                class="hover:underline text-blue-600">8号</a>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs font-bold whitespace-nowrap">📈
+                            積算日射(MJ)</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">9.0</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs font-bold text-center">
+                            16.1</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">💡 LED累積(MJ)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">0.0</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">0.0</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">☀️ 前日積算(MJ)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">11.6</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">22.6</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">🌡️ 気温(℃)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-center text-blue-900"
+                            >
+                            25.7</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-center text-blue-900"
+                            >
+                            25.0</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">🌡️ 最高(℃)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">29.0</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">29.8</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">🌡️ 最低(℃)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">12.6</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">13.1</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs font-bold whitespace-nowrap">💧
+                            湿度(%)</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-center text-blue-900"
+                            >
+                            64.1</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-center text-blue-900"
+                            >
+                            51.0</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs font-bold whitespace-nowrap">💨
+                            飽差(kPa)</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-center text-blue-900"
+                            >
+                            8.6</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-center text-blue-900"
+                            >
+                            11.3</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">🌬️ CO2(ppm)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-center text-blue-900"
+                            >
+                            388</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-center text-blue-900"
+                            >
+                            383</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">☀️ 日射(W)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">183.0</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">371.0</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">📊 24H平均(℃)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">18.9</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">19.2</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">📊 48H平均(℃)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">18.9</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">19.3</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">📊 72H平均(℃)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">18.8</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">19.0</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">📊 当日昼平均(℃)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">22.8</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">23.1</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">📊 夜平均(℃)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">14.1</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">14.5</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">⚖️ DIF(℃)
+                        </td>
+                        <td
+                            class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-blue-900 text-center">
+                            8.6</td>
+                        <td
+                            class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-blue-900 text-center">
+                            8.4</td>
+                    </tr>
+                    <!-- Watering Estimate Row (4H Prior) -->
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">🚿 潅水目安(-4H)
+                        </td>
+                        <td
+                            class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center font-bold text-blue-800">
+                            40,000
+                        </td>
+                        <td
+                            class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center font-bold text-blue-800">
+                            40,000
+                        </td>
+                    </tr>
+                    <!-- Watering Estimate Row (Final) -->
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">🚿
+                            潅水目安(-3.5H)</td>
+                        <td
+                            class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center font-bold text-teal-700">
+                            40,000
+                        </td>
+                        <td
+                            class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center font-bold text-teal-700">
+                            40,000
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 灌水目安 -->
+        <div class="bg-white rounded-lg shadow p-2 mb-2">
+            <div class="flex gap-2 mb-2 text-xs items-center">
+                <h3 class="text-[10px] font-bold text-gray-400">潅水目安</h3>
+                <div class="flex items-center gap-1">
+                    <span class="text-orange-500">🌅</span>
+                    <span class="font-mono font-bold">5:09</span>
+                </div>
+                <div class="flex items-center gap-1">
+                    <span class="text-indigo-500">🌇</span>
+                    <span class="font-mono font-bold">18:16</span>
+                </div>
+                <div class="flex items-center gap-1 ml-2">
+                    <span class="text-gray-500">+2H</span>
+                    <span class="font-mono font-bold">07:09</span>
+                </div>
+                <div class="flex items-center gap-1">
+                    <span class="text-gray-500">-4H</span>
+                    <span class="font-mono font-bold">14:16</span>
+                </div>
+            </div>
+
+            <div>
+                <div class="flex flex-wrap gap-1">
+                    <div class="flex flex-col items-center" style="min-width: 42px;">
+                        <div
+                            class="bg-white border border-gray-200 rounded p-1 text-center w-full">
+                            <div class="text-[9px] font-mono font-semibold">12:29</div>
+                            <div class="text-[8px] text-gray-500">14.5MJ</div>
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-center" style="min-width: 42px;">
+                        <div
+                            class="bg-white border border-gray-400 bg-gray-100 rounded p-1 text-center w-full">
+                            <div class="text-[9px] font-mono font-semibold">13:15</div>
+                            <div class="text-[8px] text-gray-700">16.0MJ</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 異常検知履歴 -->
+
+    </div>
+</body>
+
+</html>

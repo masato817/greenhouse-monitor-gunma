@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Google Fots -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        /* Tailwind CSS CDN */
+        @import url('https://cdn.tailwindcss.com');
+    </style>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Noto Sans JP', 'sans-serif'],
+                    },
+                    colors: {
+                        'brand-green': '#10B981',
+                        'brand-dark': '#064E3B',
+                        'brand-light': '#D1FAE5',
+                    }
+                }
+            }
+        }
+    </script>
+    <title>環境モニター | サングレイス</title>
+</head>
+
+<body class="bg-gray-100 font-sans text-gray-800 antialiased selection:bg-brand-light selection:text-brand-dark">
+
+    <!-- Loading Overlay -->
+    <div id="loading"
+        class="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center transition-opacity duration-300">
+        <div class="animate-spin rounded-full h-12 w-12 border-4 border-brand-green border-t-transparent shadow-lg">
+        </div>
+        <p class="mt-4 text-brand-dark font-medium animate-pulse">データを取得中...</p>
+    </div>
+
+    <!-- Main Content -->
+    <div id="content" class="min-h-screen flex flex-col opacity-0 transition-opacity duration-500">
+        <!-- Header -->
+        <header class="bg-white shadow-sm sticky top-0 z-10 backdrop-blur-md bg-white/90">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <div class="w-2 h-8 bg-brand-green rounded-full"></div>
+                    <h1 class="text-xl font-bold text-gray-800 tracking-tight">環境モニター</h1>
+                </div>
+                <div class="flex items-center gap-4 text-sm">
+                    <!-- Update Time -->
+                    <div
+                        class="text-gray-500 flex items-center gap-1 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span id="updated-at">--/-- --:--</span>
+                    </div>
+
+                    <!-- House 1 Outside Data -->
+                    <div
+                        class="hidden md:flex items-center gap-4 bg-blue-50 px-3 py-1.5 rounded-full border border-blue-100 text-blue-900 shadow-sm">
+                        <span class="text-xs font-bold bg-blue-200 px-1.5 py-0.5 rounded text-blue-800">外気象</span>
+
+                        <!-- Accumulated Solar -->
+                        <div class="flex items-baseline gap-1 border-r border-blue-200 pr-3">
+                            <span class="text-xs text-blue-600">積算日射</span>
+                            <span class="font-bold text-lg leading-none" id="h1-accumulatedSolarRadiation">
+                                -
+                            </span>
+                            <span class="text-xs text-blue-500">MJ</span>
+                        </div>
+
+                        <!-- Outside Temp -->
+                        <div class="flex items-baseline gap-1 border-r border-blue-200 pr-3">
+                            <span class="text-xs text-blue-600">外温</span>
+                            <span class="font-bold text-lg leading-none" id="h1-outsideTemperature">
+                                -
+                            </span>
+                            <span class="text-xs text-blue-500">℃</span>
+                        </div>
+
+                        <!-- Wind Speed -->
+                        <div class="flex items-baseline gap-1">
+                            <span class="text-xs text-blue-600">風速</span>
+                            <span class="font-bold text-lg leading-none" id="h1-windSpeed">
+                                -
+                            </span>
+                            <span class="text-xs text-blue-500">m/s</span>
+                            <span class="font-bold text-lg leading-none ml-1" id="h1-windDirection">
+                                -
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Dashboard Grid -->
+        <main class="flex-grow p-4 sm:p-6 lg:p-8 overflow-y-auto">
+            <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+
+                <!-- House Cards -->
+                <!-- House 1 -->
+                <article
+                    class="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden transform transition hover:scale-[1.01] hover:shadow-xl duration-300 flex flex-col">
+                    <div
+                        class="bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-3 border-b border-green-100 flex justify-between items-center">
+                        <h2 class="text-lg font-bold text-brand-dark flex items-center gap-2">
+                            <span
+                                class="flex items-center justify-center w-6 h-6 bg-brand-green text-white rounded-full text-xs">1</span>
+                            1号棟
+                        </h2>
+                        <span class="text-xs text-brand-dark/70 font-mono bg-white/50 px-2 py-0.5 rounded"
+                            id="h1-time">--:--</span>
+                    </div>
+
+                    <div class="p-0 flex-grow">
+                        <!-- Main Stats Grid -->
+                        <div class="grid grid-cols-2 gap-px bg-gray-100 border-b border-gray-100">
+                            <div class="bg-white p-3 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors group relative"
+                                title="現在温度">
+                                <span class="text-xs text-gray-500 mb-1 group-hover:text-brand-green">温度</span>
+                                <div class="flex items-baseline gap-0.5">
+                                    <span
+                                        class="text-2xl font-bold text-gray-800 group-hover:scale-110 transition-transform"
+                                        id="h1-temp">-</span>
+                                    <span class="text-xs text-gray-400">℃</span>
+                                </div>
+                                <div
+                                    class="absolute bottom-1 right-2 w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse opacity-0 group-hover:opacity-100">
+                                </div>
+                            </div>
+                            <div class="bg-white p-3 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors group"
+                                title="現在湿度">
+                                <span class="text-xs text-gray-500 mb-1 group-hover:text-blue-500">湿度</span>
+                                <div class="flex items-baseline gap-0.5">
+                                    <span
+                                        class="text-2xl font-bold text-gray-800 group-hover:scale-110 transition-transform"
+                                        id="h1-humid">-</span>
+                                    <span class="text-xs text-gray-400">%</span>
+                                </div>
+                            </div>
+                            <div class="bg-white p-3 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors group"
+                                title="CO2濃度">
+                                <span class="text-xs text-gray-500 mb-1 group-hover:text-gray-600">CO2</span>
+                                <div class="flex items-baseline gap-0.5">
+                                    <span
+                                        class="text-2xl font-bold text-gray-800 group-hover:scale-110 transition-transform"
+                                        id="h1-co2">-</span>
+                                    <span class="text-xs text-gray-400">ppm</span>
+                                </div>
+                            </div>
+                            <div class="bg-white p-3 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors group"
+                                title="飽差">
+                                <span class="text-xs text-gray-500 mb-1 group-hover:text-purple-500">飽差</span>
+                                <div class="flex items-baseline gap-0.5">
+                                    <span
+                                        class="text-2xl font-bold text-gray-800 group-hover:scale-110 transition-transform"
+                                        id="h1-vpd">-</span>
+                                    <span class="text-xs text-gray-400">g</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Details Table -->
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left text-gray-600">
+                                <tbody class="divide-y divide-gray-100">
+                                    <tr>
+                                        <td class="px-3 py-2 bg-gray-50 font-medium text-xs whitespace-nowrap w-24">☀️
+                                            日射</td>
+                                        <td class="px-3 py-2 font-mono text-right"><span id="h1-solar">-</span> <span
+                                                class="text-[10px] text-gray-400">W</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2 bg-gray-50 font-medium text-xs whitespace-nowrap">📅 本日積算
+                                        </td>
+                                        <td class="px-3 py-2 font-mono text-right"><span
+                                                id="h1-accumulatedSolarRadiation-cell">-</span> <span
+                                                class="text-[10px] text-gray-400">MJ</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td
+                                            class="px-3 py-2 bg-slate-50 font-medium text-xs whitespace-nowrap text-slate-600">
+                                            ⏮️ 前日積算</td>
+                                        <td class="px-3 py-2 font-mono text-right text-slate-700"><span
+                                                id="h1-yesterdayAccumulatedSolar">-</span> <span
+                                                class="text-[10px] text-gray-400">MJ</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td
+                                            class="px-3 py-2 bg-red-50 font-medium text-xs whitespace-nowrap text-red-600">
+                                            🔥 最高</td>
+                                        <td class="px-3 py-2 font-mono text-right text-red-700"><span
+                                                id="h1-maxTemp">-</span> <span class="text-[10px] text-red-300">℃</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td
+                                            class="px-3 py-2 bg-blue-50 font-medium text-xs whitespace-nowrap text-blue-600">
+                                            ❄️ 最低</td>
+                                        <td class="px-3 py-2 font-mono text-right text-blue-700"><span
+                                                id="h1-minTemp">-</span> <span
+                                                class="text-[10px] text-blue-300">℃</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2 bg-gray-50 font-medium text-xs whitespace-nowrap">📊 24H平均
+                                        </td>
+                                        <td class="px-3 py-2 font-mono text-right"><span id="h1-avgTemp24h">-</span>
+                                            <span class="text-[10px] text-gray-400">℃</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2 bg-gray-50 font-medium text-xs whitespace-nowrap">📊 48H平均
+                                        </td>
+                                        <td class="px-3 py-2 font-mono text-right"><span id="h1-avgTemp48h">-</span>
+                                            <span class="text-[10px] text-gray-400">℃</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2 bg-gray-50 font-medium text-xs whitespace-nowrap">📊 72H平均
+                                        </td>
+                                        <td class="px-3 py-2 font-mono text-right"><span id="h1-avgTemp72h">-</span>
+                                            <span class="text-[10px] text-gray-400">℃</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td
+                                            class="px-3 py-2 bg-orange-50 font-medium text-xs whitespace-nowrap text-orange-600">
+                                            ☀️ 昼平均</td>
+                                        <td class="px-3 py-2 font-mono text-right text-orange-700"><span
+                                                id="h1-dayAvgTemp">-</span> <span
+                                                class="text-[10px] text-orange-300">℃</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td
+                                            class="px-3 py-2 bg-indigo-50 font-medium text-xs whitespace-nowrap text-indigo-600">
+                                            🌙 夜平均</td>
+                                        <td class="px-3 py-2 font-mono text-right text-indigo-700"><span
+                                                id="h1-nightAvgTemp">-</span> <span
+                                                class="text-[10px] text-indigo-300">℃</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2 bg-gray-50 font-medium text-xs whitespace-nowrap">⏮️ 前日昼
+                                        </td>
+                                        <td class="px-3 py-2 font-mono text-right"><span id="h1-prevDayAvgTemp">-</span>
+                                            <span class="text-[10px] text-gray-400">℃</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2 bg-gray-50 font-medium text-xs whitespace-nowrap">⏮️ 前日夜
+                                        </td>
+                                        <td class="px-3 py-2 font-mono text-right"><span
+                                                id="h1-prevNightAvgTemp">-</span> <span
+                                                class="text-[10px] text-gray-400">℃</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td
+                                            class="px-3 py-2 bg-teal-50 font-medium text-xs whitespace-nowrap text-teal-600">
+                                            📉 DIF/較差</td>
+                                        <td class="px-3 py-2 font-mono text-right text-teal-700"><span
+                                                id="h1-diffDayNight">-</span> <span
+                                                class="text-[10px] text-teal-300">℃</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </article>
+
+                <!-- House 2 -->
+                <article
+                    class="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden transform transition hover:scale-[1.01] hover:shadow-xl duration-300 flex flex-col">
+                    <div
+                        class="bg-gradient-to-r from-blue-50 to-cyan-50 px-4 py-3 border-b border-blue-100 flex justify-between items-center">
+                        <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                            <span
+                                class="flex items-center justify-center w-6 h-6 bg-blue-500 text-white rounded-full text-xs">2</span>
+                            2号棟
+                        </h2>
+                        <span class="text-xs text-gray-400 font-mono bg-white/50 px-2 py-0.5 rounded"
+                            id="h2-time">--:--</span>
+                    </div>
+
+                    <div class="p-0 flex-grow">
+                        <!-- Main Stats Grid -->
+                        <div class="grid grid-cols-2 gap-px bg-gray-100 border-b border-gray-100">
+                            <div class="bg-white p-3 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors group relative"
+                                title="現在温度">
+                                <span class="text-xs text-gray-500 mb-1 group-hover:text-blue-500">温度</span>
+                                <div class="flex items-baseline gap-0.5">
+                                    <span
+                                        class="text-2xl font-bold text-gray-800 group-hover:scale-110 transition-transform"
+                                        id="h2-temp">-</span>
+                                    <span class="text-xs text-gray-400">℃</span>
+                                </div>
+                            </div>
+                            <div class="bg-white p-3 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors group"
+                                title="現在湿度">
+                                <span class="text-xs text-gray-500 mb-1 group-hover:text-cyan-500">湿度</span>
+                                <div class="flex items-baseline gap-0.5">
+                                    <span
+                                        class="text-2xl font-bold text-gray-800 group-hover:scale-110 transition-transform"
+                                        id="h2-humid">-</span>
+                                    <span class="text-xs text-gray-400">%</span>
+                                </div>
+                            </div>
+                            <div class="bg-white p-3 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors group"
+                                title="CO2濃度">
+                                <span class="text-xs text-gray-500 mb-1 group-hover:text-gray-600">CO2</span>
+                                <div class="flex items-baseline gap-0.5">
+                                    <span
+                                        class="text-2xl font-bold text-gray-800 group-hover:scale-110 transition-transform"
+                                        id="h2-co2">-</span>
+                                    <span class="text-xs text-gray-400">ppm</span>
+                                </div>
+                            </div>
+                            <div class="bg-white p-3 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors group"
+                                title="飽差">
+                                <span class="text-xs text-gray-500 mb-1 group-hover:text-purple-500">飽差</span>
+                                <div class="flex items-baseline gap-0.5">
+                                    <span
+                                        class="text-2xl font-bold text-gray-800 group-hover:scale-110 transition-transform"
+                                        id="h2-vpd">-</span>
+                                    <span class="text-xs text-gray-400">g</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Details Table -->
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left text-gray-600">
+                                <tbody class="divide-y divide-gray-100">
+                                    <tr>
+                                        <td class="px-3 py-2 bg-gray-50 font-medium text-xs whitespace-nowrap w-24">☀️
+                                            日射</td>
+                                        <td class="px-3 py-2 font-mono text-right"><span id="h2-solar">-</span> <span
+                                                class="text-[10px] text-gray-400">W</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2 bg-gray-50 font-medium text-xs whitespace-nowrap">📅 本日積算
+                                        </td>
+                                        <td class="px-3 py-2 font-mono text-right"><span
+                                                id="h2-accumulatedSolarRadiation">-</span> <span
+                                                class="text-[10px] text-gray-400">MJ</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td
+                                            class="px-3 py-2 bg-slate-50 font-medium text-xs whitespace-nowrap text-slate-600">
+                                            ⏮️ 前日積算</td>
+                                        <td class="px-3 py-2 font-mono text-right text-slate-700"><span
+                                                id="h2-yesterdayAccumulatedSolar">-</span> <span
+                                                class="text-[10px] text-gray-400">MJ</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td
+                                            class="px-3 py-2 bg-red-50 font-medium text-xs whitespace-nowrap text-red-600">
+                                            🔥 最高</td>
+                                        <td class="px-3 py-2 font-mono text-right text-red-700"><span
+                                                id="h2-maxTemp">-</span> <span class="text-[10px] text-red-300">℃</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td
+                                            class="px-3 py-2 bg-blue-50 font-medium text-xs whitespace-nowrap text-blue-600">
+                                            ❄️ 最低</td>
+                                        <td class="px-3 py-2 font-mono text-right text-blue-700"><span
+                                                id="h2-minTemp">-</span> <span
+                                                class="text-[10px] text-blue-300">℃</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2 bg-gray-50 font-medium text-xs whitespace-nowrap">📊 24H平均
+                                        </td>
+                                        <td class="px-3 py-2 font-mono text-right"><span id="h2-avgTemp24h">-</span>
+                                            <span class="text-[10px] text-gray-400">℃</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2 bg-gray-50 font-medium text-xs whitespace-nowrap">📊 48H平均
+                                        </td>
+                                        <td class="px-3 py-2 font-mono text-right"><span id="h2-avgTemp48h">-</span>
+                                            <span class="text-[10px] text-gray-400">℃</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2 bg-gray-50 font-medium text-xs whitespace-nowrap">📊 72H平均
+                                        </td>
+                                        <td class="px-3 py-2 font-mono text-right"><span id="h2-avgTemp72h">-</span>
+                                            <span class="text-[10px] text-gray-400">℃</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td
+                                            class="px-3 py-2 bg-orange-50 font-medium text-xs whitespace-nowrap text-orange-600">
+                                            ☀️ 昼平均</td>
+                                        <td class="px-3 py-2 font-mono text-right text-orange-700"><span
+                                                id="h2-dayAvgTemp">-</span> <span
+                                                class="text-[10px] text-orange-300">℃</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td
+                                            class="px-3 py-2 bg-indigo-50 font-medium text-xs whitespace-nowrap text-indigo-600">
+                                            🌙 夜平均</td>
+                                        <td class="px-3 py-2 font-mono text-right text-indigo-700"><span
+                                                id="h2-nightAvgTemp">-</span> <span
+                                                class="text-[10px] text-indigo-300">℃</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2 bg-gray-50 font-medium text-xs whitespace-nowrap">⏮️ 前日昼
+                                        </td>
+                                        <td class="px-3 py-2 font-mono text-right"><span id="h2-prevDayAvgTemp">-</span>
+                                            <span class="text-[10px] text-gray-400">℃</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2 bg-gray-50 font-medium text-xs whitespace-nowrap">⏮️ 前日夜
+                                        </td>
+                                        <td class="px-3 py-2 font-mono text-right"><span
+                                                id="h2-prevNightAvgTemp">-</span> <span
+                                                class="text-[10px] text-gray-400">℃</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td
+                                            class="px-3 py-2 bg-teal-50 font-medium text-xs whitespace-nowrap text-teal-600">
+                                            📉 DIF/較差</td>
+                                        <td class="px-3 py-2 font-mono text-right text-teal-700"><span
+                                                id="h2-diffDayNight">-</span> <span
+                                                class="text-[10px] text-teal-300">℃</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </article>
+
+                <!-- House 3 -->
+                <article
+                    class="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden transform transition hover:scale-[1.01] hover:shadow-xl duration-300 flex flex-col">
+                    <div
+                        class="bg-gradient-to-r from-orange-50 to-amber-50 px-4 py-3 border-b border-orange-100 flex justify-between items-center">
+                        <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                            <span
+                                class="flex items-center justify-center w-6 h-6 bg-orange-500 text-white rounded-full text-xs">3</span>
+                            3号棟
+                        </h2>
+                        <span class="text-xs text-gray-400 font-mono bg-white/50 px-2 py-0.5 rounded"
+                            id="h3-time">--:--</span>
+                    </div>
+
+                    <div class="p-0 flex-grow">
+                        <!-- Main Stats Grid -->
+                        <div class="grid grid-cols-2 gap-px bg-gray-100 border-b border-gray-100">
+                            <div class="bg-white p-3 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors group relative"
+                                title="現在温度">
+                                <span class="text-xs text-gray-500 mb-1 group-hover:text-orange-500">温度</span>
+                                <div class="flex items-baseline gap-0.5">
+                                    <span
+                                        class="text-2xl font-bold text-gray-800 group-hover:scale-110 transition-transform"
+                                        id="h3-temp">-</span>
+                                    <span class="text-xs text-gray-400">℃</span>
+                                </div>
+                            </div>
+                            <div class="bg-white p-3 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors group"
+                                title="現在湿度">
+                                <span class="text-xs text-gray-500 mb-1 group-hover:text-blue-500">湿度</span>
+                                <div class="flex items-baseline gap-0.5">
+                                    <span
+                                        class="text-2xl font-bold text-gray-800 group-hover:scale-110 transition-transform"
+                                        id="h3-humid">-</span>
+                                    <span class="text-xs text-gray-400">%</span>
+                                </div>
+                            </div>
+                            <div class="bg-white p-3 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors group"
+                                title="CO2濃度">
+                                <span class="text-xs text-gray-500 mb-1 group-hover:text-gray-600">CO2</span>
+                                <div class="flex items-baseline gap-0.5">
+                                    <span
+                                        class="text-2xl font-bold text-gray-800 group-hover:scale-110 transition-transform"
+                                        id="h3-co2">-</span>
+                                    <span class="text-xs text-gray-400">ppm</span>
+                                </div>
+                            </div>
+                            <div class="bg-white p-3 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors group"
+                                title="飽差">
+                                <span class="text-xs text-gray-500 mb-1 group-hover:text-purple-500">飽差</span>
+                                <div class="flex items-baseline gap-0.5">
+                                    <span
+                                        class="text-2xl font-bold text-gray-800 group-hover:scale-110 transition-transform"
+                                        id="h3-vpd">-</span>
+                                    <span class="text-xs text-gray-400">g</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Details Table -->
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left text-gray-600">
+                                <tbody class="divide-y divide-gray-100">
+                                    <tr>
+                                        <td class="px-3 py-2 bg-gray-50 font-medium text-xs whitespace-nowrap w-24">☀️
+                                            日射</td>
+                                        <td class="px-3 py-2 font-mono text-right"><span id="h3-solar">-</span> <span
+                                                class="text-[10px] text-gray-400">W</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2 bg-gray-50 font-medium text-xs whitespace-nowrap">📅 本日積算
+                                        </td>
+                                        <td class="px-3 py-2 font-mono text-right"><span
+                                                id="h3-accumulatedSolarRadiation">-</span> <span
+                                                class="text-[10px] text-gray-400">MJ</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td
+                                            class="px-3 py-2 bg-slate-50 font-medium text-xs whitespace-nowrap text-slate-600">
+                                            ⏮️ 前日積算</td>
+                                        <td class="px-3 py-2 font-mono text-right text-slate-700"><span
+                                                id="h3-yesterdayAccumulatedSolar">-</span> <span
+                                                class="text-[10px] text-gray-400">MJ</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td
+                                            class="px-3 py-2 bg-red-50 font-medium text-xs whitespace-nowrap text-red-600">
+                                            🔥 最高</td>
+                                        <td class="px-3 py-2 font-mono text-right text-red-700"><span
+                                                id="h3-maxTemp">-</span> <span class="text-[10px] text-red-300">℃</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td
+                                            class="px-3 py-2 bg-blue-50 font-medium text-xs whitespace-nowrap text-blue-600">
+                                            ❄️ 最低</td>
+                                        <td class="px-3 py-2 font-mono text-right text-blue-700"><span
+                                                id="h3-minTemp">-</span> <span
+                                                class="text-[10px] text-blue-300">℃</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2 bg-gray-50 font-medium text-xs whitespace-nowrap">📊 24H平均
+                                        </td>
+                                        <td class="px-3 py-2 font-mono text-right"><span id="h3-avgTemp24h">-</span>
+                                            <span class="text-[10px] text-gray-400">℃</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2 bg-gray-50 font-medium text-xs whitespace-nowrap">📊 48H平均
+                                        </td>
+                                        <td class="px-3 py-2 font-mono text-right"><span id="h3-avgTemp48h">-</span>
+                                            <span class="text-[10px] text-gray-400">℃</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2 bg-gray-50 font-medium text-xs whitespace-nowrap">📊 72H平均
+                                        </td>
+                                        <td class="px-3 py-2 font-mono text-right"><span id="h3-avgTemp72h">-</span>
+                                            <span class="text-[10px] text-gray-400">℃</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td
+                                            class="px-3 py-2 bg-orange-50 font-medium text-xs whitespace-nowrap text-orange-600">
+                                            ☀️ 昼平均</td>
+                                        <td class="px-3 py-2 font-mono text-right text-orange-700"><span
+                                                id="h3-dayAvgTemp">-</span> <span
+                                                class="text-[10px] text-orange-300">℃</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td
+                                            class="px-3 py-2 bg-indigo-50 font-medium text-xs whitespace-nowrap text-indigo-600">
+                                            🌙 夜平均</td>
+                                        <td class="px-3 py-2 font-mono text-right text-indigo-700"><span
+                                                id="h3-nightAvgTemp">-</span> <span
+                                                class="text-[10px] text-indigo-300">℃</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2 bg-gray-50 font-medium text-xs whitespace-nowrap">⏮️ 前日昼
+                                        </td>
+                                        <td class="px-3 py-2 font-mono text-right"><span id="h3-prevDayAvgTemp">-</span>
+                                            <span class="text-[10px] text-gray-400">℃</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2 bg-gray-50 font-medium text-xs whitespace-nowrap">⏮️ 前日夜
+                                        </td>
+                                        <td class="px-3 py-2 font-mono text-right"><span
+                                                id="h3-prevNightAvgTemp">-</span> <span
+                                                class="text-[10px] text-gray-400">℃</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td
+                                            class="px-3 py-2 bg-teal-50 font-medium text-xs whitespace-nowrap text-teal-600">
+                                            📉 DIF/較差</td>
+                                        <td class="px-3 py-2 font-mono text-right text-teal-700"><span
+                                                id="h3-diffDayNight">-</span> <span
+                                                class="text-[10px] text-teal-300">℃</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </article>
+
+                <!-- House 4 -->
+                <article
+                    class="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden transform transition hover:scale-[1.01] hover:shadow-xl duration-300 flex flex-col">
+                    <div
+                        class="bg-gradient-to-r from-purple-50 to-pink-50 px-4 py-3 border-b border-purple-100 flex justify-between items-center">
+                        <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                            <span
+                                class="flex items-center justify-center w-6 h-6 bg-purple-500 text-white rounded-full text-xs">4</span>
+                            4号棟
+                        </h2>
+                        <span class="text-xs text-gray-400 font-mono bg-white/50 px-2 py-0.5 rounded"
+                            id="h4-time">--:--</span>
+                    </div>
+
+                    <div class="p-0 flex-grow">
+                        <!-- Main Stats Grid -->
+                        <div class="grid grid-cols-2 gap-px bg-gray-100 border-b border-gray-100">
+                            <div class="bg-white p-3 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors group relative"
+                                title="現在温度">
+                                <span class="text-xs text-gray-500 mb-1 group-hover:text-purple-500">温度</span>
+                                <div class="flex items-baseline gap-0.5">
+                                    <span
+                                        class="text-2xl font-bold text-gray-800 group-hover:scale-110 transition-transform"
+                                        id="h4-temp">-</span>
+                                    <span class="text-xs text-gray-400">℃</span>
+                                </div>
+                            </div>
+                            <div class="bg-white p-3 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors group"
+                                title="現在湿度">
+                                <span class="text-xs text-gray-500 mb-1 group-hover:text-pink-500">湿度</span>
+                                <div class="flex items-baseline gap-0.5">
+                                    <span
+                                        class="text-2xl font-bold text-gray-800 group-hover:scale-110 transition-transform"
+                                        id="h4-humid">-</span>
+                                    <span class="text-xs text-gray-400">%</span>
+                                </div>
+                            </div>
+                            <div class="bg-white p-3 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors group"
+                                title="CO2濃度">
+                                <span class="text-xs text-gray-500 mb-1 group-hover:text-gray-600">CO2</span>
+                                <div class="flex items-baseline gap-0.5">
+                                    <span
+                                        class="text-2xl font-bold text-gray-800 group-hover:scale-110 transition-transform"
+                                        id="h4-co2">-</span>
+                                    <span class="text-xs text-gray-400">ppm</span>
+                                </div>
+                            </div>
+                            <div class="bg-white p-3 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors group"
+                                title="飽差">
+                                <span class="text-xs text-gray-500 mb-1 group-hover:text-purple-500">飽差</span>
+                                <div class="flex items-baseline gap-0.5">
+                                    <span
+                                        class="text-2xl font-bold text-gray-800 group-hover:scale-110 transition-transform"
+                                        id="h4-vpd">-</span>
+                                    <span class="text-xs text-gray-400">g</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Details Table -->
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left text-gray-600">
+                                <tbody class="divide-y divide-gray-100">
+                                    <tr>
+                                        <td class="px-3 py-2 bg-gray-50 font-medium text-xs whitespace-nowrap w-24">☀️
+                                            日射</td>
+                                        <td class="px-3 py-2 font-mono text-right"><span id="h4-solar">-</span> <span
+                                                class="text-[10px] text-gray-400">W</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2 bg-gray-50 font-medium text-xs whitespace-nowrap">📅 本日積算
+                                        </td>
+                                        <td class="px-3 py-2 font-mono text-right"><span
+                                                id="h4-accumulatedSolarRadiation">-</span> <span
+                                                class="text-[10px] text-gray-400">MJ</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td
+                                            class="px-3 py-2 bg-slate-50 font-medium text-xs whitespace-nowrap text-slate-600">
+                                            ⏮️ 前日積算</td>
+                                        <td class="px-3 py-2 font-mono text-right text-slate-700"><span
+                                                id="h4-yesterdayAccumulatedSolar">-</span> <span
+                                                class="text-[10px] text-gray-400">MJ</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td
+                                            class="px-3 py-2 bg-red-50 font-medium text-xs whitespace-nowrap text-red-600">
+                                            🔥 最高</td>
+                                        <td class="px-3 py-2 font-mono text-right text-red-700"><span
+                                                id="h4-maxTemp">-</span> <span class="text-[10px] text-red-300">℃</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td
+                                            class="px-3 py-2 bg-blue-50 font-medium text-xs whitespace-nowrap text-blue-600">
+                                            ❄️ 最低</td>
+                                        <td class="px-3 py-2 font-mono text-right text-blue-700"><span
+                                                id="h4-minTemp">-</span> <span
+                                                class="text-[10px] text-blue-300">℃</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2 bg-gray-50 font-medium text-xs whitespace-nowrap">📊 24H平均
+                                        </td>
+                                        <td class="px-3 py-2 font-mono text-right"><span id="h4-avgTemp24h">-</span>
+                                            <span class="text-[10px] text-gray-400">℃</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2 bg-gray-50 font-medium text-xs whitespace-nowrap">📊 48H平均
+                                        </td>
+                                        <td class="px-3 py-2 font-mono text-right"><span id="h4-avgTemp48h">-</span>
+                                            <span class="text-[10px] text-gray-400">℃</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2 bg-gray-50 font-medium text-xs whitespace-nowrap">📊 72H平均
+                                        </td>
+                                        <td class="px-3 py-2 font-mono text-right"><span id="h4-avgTemp72h">-</span>
+                                            <span class="text-[10px] text-gray-400">℃</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td
+                                            class="px-3 py-2 bg-orange-50 font-medium text-xs whitespace-nowrap text-orange-600">
+                                            ☀️ 昼平均</td>
+                                        <td class="px-3 py-2 font-mono text-right text-orange-700"><span
+                                                id="h4-dayAvgTemp">-</span> <span
+                                                class="text-[10px] text-orange-300">℃</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td
+                                            class="px-3 py-2 bg-indigo-50 font-medium text-xs whitespace-nowrap text-indigo-600">
+                                            🌙 夜平均</td>
+                                        <td class="px-3 py-2 font-mono text-right text-indigo-700"><span
+                                                id="h4-nightAvgTemp">-</span> <span
+                                                class="text-[10px] text-indigo-300">℃</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2 bg-gray-50 font-medium text-xs whitespace-nowrap">⏮️ 前日昼
+                                        </td>
+                                        <td class="px-3 py-2 font-mono text-right"><span id="h4-prevDayAvgTemp">-</span>
+                                            <span class="text-[10px] text-gray-400">℃</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2 bg-gray-50 font-medium text-xs whitespace-nowrap">⏮️ 前日夜
+                                        </td>
+                                        <td class="px-3 py-2 font-mono text-right"><span
+                                                id="h4-prevNightAvgTemp">-</span> <span
+                                                class="text-[10px] text-gray-400">℃</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td
+                                            class="px-3 py-2 bg-teal-50 font-medium text-xs whitespace-nowrap text-teal-600">
+                                            📉 DIF/較差</td>
+                                        <td class="px-3 py-2 font-mono text-right text-teal-700"><span
+                                                id="h4-diffDayNight">-</span> <span
+                                                class="text-[10px] text-teal-300">℃</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </article>
+
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="text-center p-4 text-xs text-brand-dark/50 bg-white/50 border-t border-gray-100">
+            &copy; 2024 SunGrace. All rights reserved.
+        </footer>
+    </div>
+
+    <script>
+        // Data Handling
+        function updateData() {
+            // Show loading initially or if recovering from error
+            const content = document.getElementById('content');
+
+            google.script.run
+                .withSuccessHandler(onSuccess)
+                .withFailureHandler(onFailure)
+                .getData();
+        }
+
+        function onSuccess(data) {
+            // Hide loading, show content
+            const loading = document.getElementById('loading');
+            const content = document.getElementById('content');
+
+            loading.classList.add('opacity-0', 'pointer-events-none');
+            content.classList.remove('opacity-0');
+
+            // Update timestamp
+            document.getElementById('updated-at').textContent = data.updatedAt;
+
+            // Update DOM elements
+            updateHouseData('h1-', data.houses.house1, 1);
+            updateHouseData('h2-', data.houses.house2, 2);
+            updateHouseData('h3-', data.houses.house3, 3);
+            updateHouseData('h4-', data.houses.house4, 4);
+        }
+
+        function onFailure(error) {
+            console.error('Error fetching data:', error);
+            // Optional: Show error state in UI
+        }
+
+        function updateHouseData(prefix, data, houseNum) {
+            if (!data) return;
+
+            setVal(prefix + 'time', data.timestamp ? data.timestamp.split(' ')[1].slice(0, 5) : '--:--');
+            setVal(prefix + 'temp', data.temperature);
+            setVal(prefix + 'humid', data.humidity);
+            setVal(prefix + 'co2', data.co2, false, 0);
+            setVal(prefix + 'solar', data.solarRadiation);
+            setVal(prefix + 'accumulatedSolarRadiation', data.accumulatedSolarRadiation);
+            setVal(prefix + 'vpd', data.vpd);
+            setVal(prefix + 'maxTemp', data.todayMaxTemp || data.maxTemp); // Use todayMax/Min if available
+            setVal(prefix + 'minTemp', data.todayMinTemp || data.minTemp);
+            setVal(prefix + 'avgTemp24h', data.avgTemp24h);
+            setVal(prefix + 'dayAvgTemp', data.dayAvgTemp);
+            setVal(prefix + 'nightAvgTemp', data.nightAvgTemp);
+            setVal(prefix + 'prevDayAvgTemp', data.prevDayAvgTemp);
+            setVal(prefix + 'prevNightAvgTemp', data.prevNightAvgTemp);
+            setVal(prefix + 'diffDayNight', data.diffDayNight);
+            setVal(prefix + 'yesterdayAccumulatedSolar', data.yesterdayAccumulatedSolar);
+            setVal(prefix + 'avgTemp48h', data.avgTemp48h);
+            setVal(prefix + 'avgTemp72h', data.avgTemp72h);
+
+            // Header用 (House 1のみ)
+            if (houseNum === 1) {
+                setVal(prefix + 'outsideTemperature', data.outsideTemperature);
+                setVal(prefix + 'windSpeed', data.windSpeed);
+                setVal(prefix + 'windDirection', data.windDirection, true);
+
+                // Table内のAccumulated Solar (Headerと重複ID防止のためクラスなどで制御も検討だが、一旦-cell付与で対応)
+                setVal(prefix + 'accumulatedSolarRadiation-cell', data.accumulatedSolarRadiation);
+            }
+        }
+
+        function setVal(id, val, isString = false, precision = 1) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (val !== null && val !== undefined && val !== '') {
+                el.textContent = isString ? val : Number(val).toFixed(precision);
+            } else {
+                el.textContent = '-';
+            }
+        }
+
+        // Initial Load
+        document.addEventListener('DOMContentLoaded', updateData);
+
+        // Auto Refresh every 5 minutes (optional, as page usually reloads via iframe)
+        // setInterval(updateData, 300000); 
+    </script>
+</body>
+
+</html>

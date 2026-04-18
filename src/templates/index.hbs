@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>サングレイス 環境モニター</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <meta http-equiv="refresh" content="{{refreshInterval}}">
+</head>
+
+<body class="bg-gray-100 font-sans">
+    <div class="container mx-auto p-4">
+        <header class="mb-1">
+            <!-- <h1 class="text-xl font-bold text-gray-800 mb-1">🌱 サングレイス 環境モニター</h1> -->
+            <div class="flex justify-between items-end pb-1">
+                <div class="flex items-center gap-3">
+                    <p class="text-xs text-gray-600 font-mono">最終 {{updatedAt}}</p>
+                    <a href="./gunma.html" class="text-xs text-blue-600 hover:underline">▶ 群馬</a>
+                </div>
+
+                <!-- Metrics (Compact, Right aligned) -->
+                <div class="flex gap-3 text-sm items-center">
+                    <!-- Accumulated Solar -->
+                    <div>
+                        <span class="font-bold text-blue-900">{{formatNum houses.house1.accumulatedSolarRadiation}}<span
+                                class="text-xs font-normal text-gray-500">MJ</span></span>
+                    </div>
+                    <!-- Outside Temp -->
+                    <div>
+                        <span class="font-bold text-blue-900">{{formatNum houses.house1.outsideTemperature}}<span
+                                class="text-xs font-normal text-gray-500">℃</span></span>
+                    </div>
+                    <!-- Wind Speed -->
+                    <div class="flex items-center gap-1">
+                        <span class="font-bold text-blue-900">{{formatNum houses.house1.windSpeed}}<span
+                                class="text-xs font-normal text-gray-500">m/s</span></span>
+                        {{#if houses.house1.windDirection}}
+                        <span class="font-bold text-blue-900 ml-1">{{houses.house1.windDirection}}</span>
+                        {{/if}}
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- アラートセクション (Handlebars logic to show if anomalies exist) -->
+        <div id="alerts" class="mb-6 hidden">
+            <!-- Insert alerts here -->
+        </div>
+
+        <!-- データテーブル -->
+        <div class="overflow-x-auto bg-white rounded-lg shadow mb-2">
+            <table class="min-w-full leading-normal">
+                <thead>
+                    <tr>
+                        <th
+                            class="px-1 py-2 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-1/5">
+                            項目
+                        </th>
+                        <!-- House Headers -->
+                        <th
+                            class="px-1 py-2 border-b-2 border-gray-200 bg-gray-100 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider w-1/5">
+                            <a href="https://pms.profarm-j.com/" target="_blank"
+                                class="hover:underline text-blue-600">1号</a>
+                        </th>
+                        <th
+                            class="px-1 py-2 border-b-2 border-gray-200 bg-gray-100 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider w-1/5">
+                            <a href="https://profindercloud.seiwa-ecosys.jp/Profinder" target="_blank"
+                                class="hover:underline text-blue-600">2号</a>
+                        </th>
+                        <th
+                            class="px-1 py-2 border-b-2 border-gray-200 bg-gray-100 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider w-1/5">
+                            <a href="https://profindercloud.seiwa-ecosys.jp/Profinder" target="_blank"
+                                class="hover:underline text-blue-600">3号</a>
+                        </th>
+                        <th
+                            class="px-1 py-2 border-b-2 border-gray-200 bg-gray-100 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider w-1/5">
+                            <a href="https://profindercloud.seiwa-ecosys.jp/Profinder" target="_blank"
+                                class="hover:underline text-blue-600">4号</a>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs font-bold whitespace-nowrap">📈
+                            積算日射(MJ)</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs font-bold text-center">
+                            {{formatNum houses.house1.accumulatedSolarRadiation}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house2.accumulatedSolarRadiation}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house3.accumulatedSolarRadiation}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house4.accumulatedSolarRadiation}}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">💡 LED累積(MJ)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house1.ledAccumulation}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house2.ledAccumulation}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house3.ledAccumulation}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house4.ledAccumulation}}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">☀️ 前日積算(MJ)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house1.yesterdayAccumulatedSolar}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house2.yesterdayAccumulatedSolar}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house3.yesterdayAccumulatedSolar}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house4.yesterdayAccumulatedSolar}}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">🌡️ 気温(℃)
+                        </td>
+                        {{#with (checkThreshold "1号" "気温(℃)" houses.house1.temperature)}}
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-center {{#if isAbnormal}}text-red-600{{else}}text-blue-900{{/if}}"
+                            {{#if isAbnormal}}style="color: red; font-weight: bold;" {{/if}}>
+                            {{formatNum value}}</td>
+                        {{/with}}
+                        {{#with (checkThreshold "2号" "気温(℃)" houses.house2.temperature)}}
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-center {{#if isAbnormal}}text-red-600{{else}}text-blue-900{{/if}}"
+                            {{#if isAbnormal}}style="color: red; font-weight: bold;" {{/if}}>
+                            {{formatNum value}}</td>
+                        {{/with}}
+                        {{#with (checkThreshold "3号" "気温(℃)" houses.house3.temperature)}}
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-center {{#if isAbnormal}}text-red-600{{else}}text-blue-900{{/if}}"
+                            {{#if isAbnormal}}style="color: red; font-weight: bold;" {{/if}}>
+                            {{formatNum value}}</td>
+                        {{/with}}
+                        {{#with (checkThreshold "4号" "気温(℃)" houses.house4.temperature)}}
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-center {{#if isAbnormal}}text-red-600{{else}}text-blue-900{{/if}}"
+                            {{#if isAbnormal}}style="color: red; font-weight: bold;" {{/if}}>
+                            {{formatNum value}}</td>
+                        {{/with}}
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">🌡️ 最高(℃)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house1.todayMaxTemp}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house2.todayMaxTemp}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house3.todayMaxTemp}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house4.todayMaxTemp}}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">🌡️ 最低(℃)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house1.todayMinTemp}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house2.todayMinTemp}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house3.todayMinTemp}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house4.todayMinTemp}}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs font-bold whitespace-nowrap">💧
+                            湿度(%)</td>
+                        {{#with (checkThreshold "1号" "湿度(%)" houses.house1.humidity)}}
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-center {{#if isAbnormal}}text-red-600{{else}}text-blue-900{{/if}}"
+                            {{#if isAbnormal}}style="color: red; font-weight: bold;" {{/if}}>
+                            {{formatNum value}}</td>
+                        {{/with}}
+                        {{#with (checkThreshold "2号" "湿度(%)" houses.house2.humidity)}}
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-center {{#if isAbnormal}}text-red-600{{else}}text-blue-900{{/if}}"
+                            {{#if isAbnormal}}style="color: red; font-weight: bold;" {{/if}}>
+                            {{formatNum value}}</td>
+                        {{/with}}
+                        {{#with (checkThreshold "3号" "湿度(%)" houses.house3.humidity)}}
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-center {{#if isAbnormal}}text-red-600{{else}}text-blue-900{{/if}}"
+                            {{#if isAbnormal}}style="color: red; font-weight: bold;" {{/if}}>
+                            {{formatNum value}}</td>
+                        {{/with}}
+                        {{#with (checkThreshold "4号" "湿度(%)" houses.house4.humidity)}}
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-center {{#if isAbnormal}}text-red-600{{else}}text-blue-900{{/if}}"
+                            {{#if isAbnormal}}style="color: red; font-weight: bold;" {{/if}}>
+                            {{formatNum value}}</td>
+                        {{/with}}
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs font-bold whitespace-nowrap">💨
+                            飽差(kPa)</td>
+                        {{#with (checkThreshold "1号" "飽差(kPa)" houses.house1.vpd)}}
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-center {{#if isAbnormal}}text-red-600{{else}}text-blue-900{{/if}}"
+                            {{#if isAbnormal}}style="color: red; font-weight: bold;" {{/if}}>
+                            {{formatNum value}}</td>
+                        {{/with}}
+                        {{#with (checkThreshold "2号" "飽差(kPa)" houses.house2.vpd)}}
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-center {{#if isAbnormal}}text-red-600{{else}}text-blue-900{{/if}}"
+                            {{#if isAbnormal}}style="color: red; font-weight: bold;" {{/if}}>
+                            {{formatNum value}}</td>
+                        {{/with}}
+                        {{#with (checkThreshold "3号" "飽差(kPa)" houses.house3.vpd)}}
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-center {{#if isAbnormal}}text-red-600{{else}}text-blue-900{{/if}}"
+                            {{#if isAbnormal}}style="color: red; font-weight: bold;" {{/if}}>
+                            {{formatNum value}}</td>
+                        {{/with}}
+                        {{#with (checkThreshold "4号" "飽差(kPa)" houses.house4.vpd)}}
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-center {{#if isAbnormal}}text-red-600{{else}}text-blue-900{{/if}}"
+                            {{#if isAbnormal}}style="color: red; font-weight: bold;" {{/if}}>
+                            {{formatNum value}}</td>
+                        {{/with}}
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">🌬️ CO2(ppm)
+                        </td>
+                        {{#with (checkThreshold "1号" "CO2(ppm)" houses.house1.co2)}}
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-center {{#if isAbnormal}}text-red-600{{else}}text-blue-900{{/if}}"
+                            {{#if isAbnormal}}style="color: red; font-weight: bold;" {{/if}}>
+                            {{formatInt value}}</td>
+                        {{/with}}
+                        {{#with (checkThreshold "2号" "CO2(ppm)" houses.house2.co2)}}
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-center {{#if isAbnormal}}text-red-600{{else}}text-blue-900{{/if}}"
+                            {{#if isAbnormal}}style="color: red; font-weight: bold;" {{/if}}>
+                            {{formatInt value}}</td>
+                        {{/with}}
+                        {{#with (checkThreshold "3号" "CO2(ppm)" houses.house3.co2)}}
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-center {{#if isAbnormal}}text-red-600{{else}}text-blue-900{{/if}}"
+                            {{#if isAbnormal}}style="color: red; font-weight: bold;" {{/if}}>
+                            {{formatInt value}}</td>
+                        {{/with}}
+                        {{#with (checkThreshold "4号" "CO2(ppm)" houses.house4.co2)}}
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-center {{#if isAbnormal}}text-red-600{{else}}text-blue-900{{/if}}"
+                            {{#if isAbnormal}}style="color: red; font-weight: bold;" {{/if}}>
+                            {{formatInt value}}</td>
+                        {{/with}}
+                    </tr>
+
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">☀️ 日射(W)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house1.solarRadiation}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house2.solarRadiation}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house3.solarRadiation}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house4.solarRadiation}}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">📊 24H平均(℃)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house1.avgTemp24h}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house2.avgTemp24h}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house3.avgTemp24h}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house4.avgTemp24h}}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">📊 48H平均(℃)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house1.avgTemp48h}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house2.avgTemp48h}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house3.avgTemp48h}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house4.avgTemp48h}}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">📊 72H平均(℃)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house1.avgTemp72h}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house2.avgTemp72h}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house3.avgTemp72h}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house4.avgTemp72h}}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">📊 当日昼平均(℃)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house1.dayAvgTemp}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house2.dayAvgTemp}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house3.dayAvgTemp}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house4.dayAvgTemp}}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">📊 夜平均(℃)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house1.nightAvgTemp}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house2.prevNightAvgTemp}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house3.prevNightAvgTemp}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house4.prevNightAvgTemp}}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">⚖️ DIF(℃)
+                        </td>
+                        <td
+                            class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-blue-900 text-center">
+                            {{formatNum
+                            houses.house1.diffDayNight}}</td>
+                        <td
+                            class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-blue-900 text-center">
+                            {{formatNum
+                            houses.house2.diffDayNight}}</td>
+                        <td
+                            class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-blue-900 text-center">
+                            {{formatNum
+                            houses.house3.diffDayNight}}</td>
+                        <td
+                            class="px-0.5 py-1 border-b border-gray-200 bg-white text-sm font-bold text-blue-900 text-center">
+                            {{formatNum
+                            houses.house4.diffDayNight}}</td>
+                    </tr>
+                    <!-- Watering Estimate Row (4H Prior) -->
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">🚿 潅水目安(-4H)
+                        </td>
+                        <td
+                            class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center font-bold text-blue-800">
+                            {{calcWateringEstimate @root.referenceSolar
+                            houses.house1.lightingStartTime houses.house1.lightingEndTime houses.house1.area}}
+                        </td>
+                        <td
+                            class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center font-bold text-blue-800">
+                            {{calcWateringEstimate @root.referenceSolar
+                            houses.house2.lightingStartTime houses.house2.lightingEndTime houses.house2.area}}
+                        </td>
+                        <td
+                            class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center font-bold text-blue-800">
+                            {{calcWateringEstimate @root.referenceSolar
+                            houses.house3.lightingStartTime houses.house3.lightingEndTime houses.house3.area}}
+                        </td>
+                        <td
+                            class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center font-bold text-blue-800">
+                            {{calcWateringEstimate @root.referenceSolar
+                            houses.house4.lightingStartTime houses.house4.lightingEndTime houses.house4.area}}
+                        </td>
+                    </tr>
+                    <!-- Watering Estimate Row (Final) -->
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">🚿
+                            潅水目安(-3.5H)</td>
+                        <td
+                            class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center font-bold text-teal-700">
+                            {{calcWateringEstimate @root.effectiveSolar
+                            houses.house1.lightingStartTime houses.house1.lightingEndTime houses.house1.area}}
+                        </td>
+                        <td
+                            class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center font-bold text-teal-700">
+                            {{calcWateringEstimate @root.effectiveSolar
+                            houses.house2.lightingStartTime houses.house2.lightingEndTime houses.house2.area}}
+                        </td>
+                        <td
+                            class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center font-bold text-teal-700">
+                            {{calcWateringEstimate @root.effectiveSolar
+                            houses.house3.lightingStartTime houses.house3.lightingEndTime houses.house3.area}}
+                        </td>
+                        <td
+                            class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center font-bold text-teal-700">
+                            {{calcWateringEstimate @root.effectiveSolar
+                            houses.house4.lightingStartTime houses.house4.lightingEndTime houses.house4.area}}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 灌水目安 (Node.js Generated) -->
+        {{#if wateringGuide}}
+        <div class="bg-white rounded-lg shadow p-2 mb-2">
+            <!-- Parameters + Title (Compact Single Row) -->
+            <div class="flex gap-2 mb-2 text-xs items-center">
+                <h3 class="text-[10px] font-bold text-gray-400">潅水目安</h3>
+                <div class="flex items-center gap-1">
+                    <span class="text-orange-500">🌅</span>
+                    <span class="font-mono font-bold">{{formatTime wateringGuide.sunrise}}</span>
+                </div>
+                <div class="flex items-center gap-1">
+                    <span class="text-indigo-500">🌇</span>
+                    <span class="font-mono font-bold">{{formatTime wateringGuide.sunset}}</span>
+                </div>
+                <div class="flex items-center gap-1 ml-2">
+                    <span class="text-gray-500">+2H</span>
+                    <span class="font-mono font-bold">{{formatTime wateringGuide.startTime}}</span>
+                </div>
+                <div class="flex items-center gap-1">
+                    <span class="text-gray-500">-4H</span>
+                    <span class="font-mono font-bold">{{formatTime wateringGuide.endTime}}</span>
+                </div>
+            </div>
+
+            <!-- Timeline (Compact) - flex-wrapで10回以上も対応 -->
+            {{#if wateringGuide.times}}
+            <div>
+                <div class="flex flex-wrap gap-1">
+                    {{#each wateringGuide.times}}
+                    <div class="flex flex-col items-center" style="min-width: 42px;">
+                        <div
+                            class="bg-white border {{#if isFinal}}border-gray-400 bg-gray-100{{else}}{{#if (eq type 'start')}}border-gray-200{{else}}border-blue-200{{/if}}{{/if}} rounded p-1 text-center w-full">
+                            <div class="text-[9px] font-mono font-semibold">{{time}}</div>
+                            <div class="text-[8px] {{#if isFinal}}text-gray-700{{else}}text-gray-500{{/if}}">{{formatNum
+                                mj}}MJ</div>
+                        </div>
+                    </div>
+                    {{/each}}
+                </div>
+            </div>
+            {{/if}}
+            <!-- 潅水目安履歴 (過去7日間) -->
+            {{#if wateringGuideHistory}}
+            <div class="mt-3">
+                <h3 class="text-[10px] font-bold text-gray-400 mb-1">📅 潅水目安履歴 (過去7日間)</h3>
+                <div class="bg-white rounded border border-gray-200 overflow-hidden">
+                    {{#each wateringGuideHistory}}
+                    <div class="border-b border-gray-100 last:border-b-0 p-1.5">
+                        <div class="flex justify-between items-center mb-1">
+                            <div class="text-[9px] font-bold text-gray-600">{{date}}</div>
+                            <div class="text-[9px] text-gray-500">
+                                総日射量:{{formatNum dailyTotalSolar}}MJ
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap gap-0.5">
+                            {{#each marks}}
+                            <div class="text-center {{#if (eq number 1)}}bg-gray-50{{else}}bg-blue-50{{/if}} rounded px-0.5 py-1"
+                                style="min-width: 42px;">
+                                <div class="text-[9px] font-mono font-semibold">{{time}}</div>
+                                <div class="text-[8px] text-gray-500">{{formatNum mj}}MJ</div>
+                            </div>
+                            {{/each}}
+                        </div>
+                    </div>
+                    {{/each}}
+                </div>
+            </div>
+            {{/if}}
+        </div>
+        {{/if}}
+
+        <!-- 異常検知履歴 (直近) -->
+        {{#if anomalyPeriods}}
+        <div class="bg-red-50 rounded-lg shadow p-2 mb-2 border border-red-200">
+            <h3 class="text-[10px] font-bold text-red-600 mb-1 flex items-center">
+                <span class="mr-1">⚠️</span> 異常検知履歴 (直近)
+            </h3>
+            <div class="bg-white rounded border border-red-100 overflow-hidden">
+                <table class="min-w-full leading-normal">
+                    <thead>
+                        <tr>
+                            <th
+                                class="px-1 py-1 border-b border-gray-200 bg-red-50 text-left text-[9px] font-semibold text-gray-600">
+                                日時
+                            </th>
+                            <th
+                                class="px-1 py-1 border-b border-gray-200 bg-red-50 text-left text-[9px] font-semibold text-gray-600">
+                                場所
+                            </th>
+                            <th
+                                class="px-1 py-1 border-b border-gray-200 bg-red-50 text-left text-[9px] font-semibold text-gray-600">
+                                項目
+                            </th>
+                            <th
+                                class="px-1 py-1 border-b border-gray-200 bg-red-50 text-right text-[9px] font-semibold text-gray-600">
+                                値
+                            </th>
+                            <th
+                                class="px-1 py-1 border-b border-gray-200 bg-red-50 text-right text-[9px] font-semibold text-gray-600">
+                                期間
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{#each anomalyPeriods}}
+                        <tr>
+                            <td class="px-1 py-1 border-b border-gray-100 text-[9px] text-gray-700 whitespace-nowrap">
+                                {{formatJapanese endTime 'MM/dd HH:mm'}}
+                            </td>
+                            <td class="px-1 py-1 border-b border-gray-100 text-[9px] text-gray-700 whitespace-nowrap">
+                                {{house}}
+                            </td>
+                            <td class="px-1 py-1 border-b border-gray-100 text-[9px] text-gray-700 whitespace-nowrap">
+                                {{item}}
+                            </td>
+                            <td
+                                class="px-1 py-1 border-b border-gray-100 text-[9px] font-bold whitespace-nowrap text-right {{#if (eq type 'upper')}}text-red-600{{else}}text-blue-600{{/if}}">
+                                {{formatNum maxValue}}
+                                <span class="text-[8px] font-normal text-gray-500">
+                                    {{#if (eq type 'upper')}}(>{{formatNum thresholdValue}}){{else}}(<{{formatNum
+                                        thresholdValue}}){{/if}} </span>
+                            </td>
+                            <td
+                                class="px-1 py-1 border-b border-gray-100 text-[9px] text-gray-500 text-right whitespace-nowrap">
+                                {{durationString}}
+                            </td>
+                        </tr>
+                        {{/each}}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {{/if}}
+
+    </div>
+</body>
+
+</html>

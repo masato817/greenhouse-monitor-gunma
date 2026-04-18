@@ -1,0 +1,55 @@
+name: Update Greenhouse Data
+
+on:
+  # schedule:
+  #   # 10分ごとに実行 (**:00, **:10, **:20, **:30, **:40, **:50)
+  #   - cron: '*/10 * * * *'
+  workflow_dispatch:
+    # 手動実行ボタンを有効化
+
+permissions:
+  contents: write
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Scrape Data and Generate HTML
+      env:
+        PROFINDER_URL: ${{ secrets.PROFINDER_URL }}
+        PROFINDER_USER: ${{ secrets.PROFINDER_USER }}
+        PROFINDER_PASS: ${{ secrets.PROFINDER_PASS }}
+        PROFARM_URL: ${{ secrets.PROFARM_URL }}
+        PROFARM_USER: ${{ secrets.PROFARM_USER }}
+        PROFARM_PASS: ${{ secrets.PROFARM_PASS }}
+        HEADLESS: true
+        # Google Sheets/LINE関連は今回は省略（必要ならSecrets追加）
+        TZ: 'Asia/Tokyo'
+      run: npm run scrape
+
+    - name: Commit and Push changes
+      run: |
+        git config --global user.name 'github-actions[bot]'
+        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+        
+        # 変更があるか確認
+        if git diff --quiet public/index.html; then
+          echo "No changes to commit"
+        else
+          git add public/index.html
+          git commit -m "Auto update data (via GitHub Actions)"
+          git push
+        fi

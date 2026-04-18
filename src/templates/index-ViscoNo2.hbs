@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>サングレイス 環境モニター</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <meta http-equiv="refresh" content="{{refreshInterval}}">
+</head>
+
+<body class="bg-gray-100 font-sans">
+    <div class="container mx-auto p-4">
+        <header class="mb-2">
+            <h1 class="text-xl font-bold text-gray-800 mb-1">🌱 サングレイス 環境モニター</h1>
+            <div class="flex justify-between items-end border-b-2 border-gray-200 pb-2">
+                <div>
+                    <p class="text-xs text-gray-600 font-mono">最終 {{updatedAt}}</p>
+                </div>
+
+                <!-- Metrics (Compact, Right aligned) -->
+                <div class="flex gap-3 text-sm items-center">
+                    <!-- Accumulated Solar -->
+                    <div>
+                        <span class="font-bold text-blue-700">{{formatNum houses.house1.accumulatedSolarRadiation}}<span
+                                class="text-xs font-normal text-gray-500">MJ</span></span>
+                    </div>
+                    <!-- Outside Temp -->
+                    <div>
+                        <span class="font-bold text-blue-700">{{formatNum houses.house1.outsideTemperature}}<span
+                                class="text-xs font-normal text-gray-500">℃</span></span>
+                    </div>
+                    <!-- Wind Speed -->
+                    <div>
+                        <span class="font-bold text-blue-700">{{formatNum houses.house1.windSpeed}}<span
+                                class="text-xs font-normal text-gray-500">m/s</span></span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- アラートセクション (Handlebars logic to show if anomalies exist) -->
+        <div id="alerts" class="mb-6 hidden">
+            <!-- Insert alerts here -->
+        </div>
+
+        <!-- データテーブル -->
+        <div class="overflow-x-auto bg-white rounded-lg shadow mb-2">
+            <table class="min-w-full leading-normal">
+                <thead>
+                    <tr>
+                        <th
+                            class="px-1 py-2 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-1/5">
+                            項目
+                        </th>
+                        <!-- House Headers -->
+                        <th
+                            class="px-1 py-2 border-b-2 border-gray-200 bg-gray-100 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider w-1/5">
+                            1号
+                        </th>
+                        <th
+                            class="px-1 py-2 border-b-2 border-gray-200 bg-gray-100 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider w-1/5">
+                            2号
+                        </th>
+                        <th
+                            class="px-1 py-2 border-b-2 border-gray-200 bg-gray-100 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider w-1/5">
+                            3号
+                        </th>
+                        <th
+                            class="px-1 py-2 border-b-2 border-gray-200 bg-gray-100 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider w-1/5">
+                            4号
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs font-bold whitespace-nowrap">📈
+                            積算日射(MJ)</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs font-bold text-center">
+                            {{formatNum houses.house1.accumulatedSolarRadiation}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house2.accumulatedSolarRadiation}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house3.accumulatedSolarRadiation}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house4.accumulatedSolarRadiation}}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">☀️ 前日積算(MJ)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house1.yesterdayAccumulatedSolar}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house2.yesterdayAccumulatedSolar}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house3.yesterdayAccumulatedSolar}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house4.yesterdayAccumulatedSolar}}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">🌡️ 気温(℃)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs font-bold text-center">
+                            {{formatNum houses.house1.temperature}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs font-bold text-center">
+                            {{formatNum houses.house2.temperature}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs font-bold text-center">
+                            {{formatNum houses.house3.temperature}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs font-bold text-center">
+                            {{formatNum houses.house4.temperature}}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">🌡️ 最高(℃)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house1.todayMaxTemp}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house2.todayMaxTemp}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house3.todayMaxTemp}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house4.todayMaxTemp}}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">🌡️ 最低(℃)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house1.todayMinTemp}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house2.todayMinTemp}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house3.todayMinTemp}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house4.todayMinTemp}}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs font-bold whitespace-nowrap">💧
+                            湿度(%)</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs font-bold text-center">
+                            {{formatNum houses.house1.humidity}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs font-bold text-center">
+                            {{formatNum houses.house2.humidity}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs font-bold text-center">
+                            {{formatNum houses.house3.humidity}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs font-bold text-center">
+                            {{formatNum houses.house4.humidity}}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">💨 飽差(kPa)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house1.vpd}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house2.vpd}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house3.vpd}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house4.vpd}}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">🌬️ CO2(ppm)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house1.co2}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house2.co2}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house3.co2}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house4.co2}}</td>
+                    </tr>
+
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">☀️ 日射(W)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house1.solarRadiation}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house2.solarRadiation}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house3.solarRadiation}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house4.solarRadiation}}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">📊 24平均(℃)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house1.avgTemp24h}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house2.avgTemp24h}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house3.avgTemp24h}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house4.avgTemp24h}}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">📊 48H平均(℃)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house1.avgTemp48h}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house2.avgTemp48h}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house3.avgTemp48h}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house4.avgTemp48h}}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">📊 72H平均(℃)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house1.avgTemp72h}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house2.avgTemp72h}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house3.avgTemp72h}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house4.avgTemp72h}}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">📊 昼平均(℃)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house1.dayAvgTemp}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house2.dayAvgTemp}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house3.dayAvgTemp}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house4.dayAvgTemp}}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">📊 夜平均(℃)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house1.nightAvgTemp}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house2.prevNightAvgTemp}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house3.prevNightAvgTemp}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house4.prevNightAvgTemp}}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs whitespace-nowrap">⚖️ DIF(℃)
+                        </td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house1.diffDayNight}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house2.diffDayNight}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house3.diffDayNight}}</td>
+                        <td class="px-0.5 py-1 border-b border-gray-200 bg-white text-xs text-center">{{formatNum
+                            houses.house4.diffDayNight}}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 灌水目安 -->
+        <div class="bg-white rounded-lg shadow p-2 mb-2">
+            <h2 class="text-sm font-bold mb-1">💧 本日の灌水目安（1号棟ベース）</h2>
+            <div class="relative pt-1">
+                <div class="flex mb-2 items-center justify-between">
+                    <div>
+                        <span
+                            class="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-blue-600 bg-blue-200">
+                            進行度
+                        </span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs font-semibold inline-block text-blue-600">
+                            60%
+                        </span>
+                    </div>
+                </div>
+                <div class="overflow-hidden h-2 mb-4 text-xs flex rounded bg-blue-200">
+                    <div style="width:60%"
+                        class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-500">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</body>
+
+</html>
