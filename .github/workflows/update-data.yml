@@ -44,12 +44,11 @@ jobs:
       run: |
         git config --global user.name 'github-actions[bot]'
         git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-        
-        # 変更があるか確認
-        if git diff --quiet public/index.html; then
-          echo "No changes to commit"
+
+        git add public/index.html public/gunma.html
+        if git diff --cached --quiet; then
+          echo "No changes to commit (dashboard HTML unchanged)"
         else
-          git add public/index.html
-          git commit -m "Auto update data (via GitHub Actions)"
+          git commit -m "chore: auto-update dashboards (GitHub Actions)"
           git push
         fi
