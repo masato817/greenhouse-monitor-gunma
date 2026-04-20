@@ -1,9 +1,9 @@
 @echo off
-REM 別PC（タスクスケジューラ）用: fetch+reset で強制同期 → スクレイプ → public 更新 → 変更があれば push
-REM 前提: このPCで「git config user.name / user.email」と「git push」が通ること。
-REM 前提: このPCは scrape 専用。ソース等の手動編集は行わない（reset --hard で上書きされるため）。
-REM 環境変数 SKIP_GIT_SYNC=1 で fetch+reset を省略（オフライン試験など）
-REM 分岐（divergence）防止のため v1 と同じ fetch + reset --hard 方式に統一。
+REM 24h PC (task scheduler) entry: fetch+reset -> scrape -> update public -> push if changed
+REM Assumption: this PC has git user.name/email set and can push.
+REM Assumption: this PC is scrape-only. Do not edit sources by hand (reset --hard wipes local).
+REM Set SKIP_GIT_SYNC=1 to skip fetch+reset (offline test etc).
+REM Unified with v1 approach: fetch + reset --hard to prevent divergence.
 setlocal EnableExtensions EnableDelayedExpansion
 set "REPO_ROOT=%~dp0.."
 cd /d "%REPO_ROOT%" || exit /b 1
@@ -26,7 +26,7 @@ if "%SKIP_GIT_SYNC%"=="1" (
     exit /b 1
   )
   echo ----- git reset --hard origin/main ----- >> "%LOGFILE%"
-  REM リモートと強制同期。ローカルの未コミット変更や独立コミットは破棄される。
+  REM Force sync with remote. Local uncommitted edits and local commits are discarded.
   git reset --hard origin/main >> "%LOGFILE%" 2>&1
   set "RESET_EC=!ERRORLEVEL!"
   if not "!RESET_EC!"=="0" (
@@ -51,10 +51,10 @@ git status --short public >> "%LOGFILE%" 2>&1
 git add public/index.html public/gunma.html >> "%LOGFILE%" 2>&1
 git diff --cached --quiet
 set "DIFF_EC=!ERRORLEVEL!"
-REM git diff --cached --quiet: 差分なし=0 / 差分あり=1
+REM git diff --cached --quiet: no diff=0 / has diff=1
 if "!DIFF_EC!"=="0" (
   echo No staged diff for index.html or gunma.html. Nothing to push.>> "%LOGFILE%"
-  echo Hint: If dashboards were skipped, check combined.log for 0件 or Sheets errors.>> "%LOGFILE%"
+  echo Hint: If dashboards were skipped, check combined.log for 0 rows or Sheets errors.>> "%LOGFILE%"
   exit /b 0
 )
 
