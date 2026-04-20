@@ -1,6 +1,9 @@
 @echo off
-REM 24h稼働PC用: スクレイプ → public 更新 → 変更があれば git push（GitHub Pages 反映）
-REM 前提: このPCで一度「git config user.name / user.email」と「git push」成功済みであること。
+REM 別PC（タスクスケジューラ）用: fetch+reset で強制同期 → スクレイプ → public 更新 → 変更があれば push
+REM 前提: このPCで「git config user.name / user.email」と「git push」が通ること。
+REM 前提: このPCは scrape 専用。ソース等の手動編集は行わない（reset --hard で上書きされるため）。
+REM 環境変数 SKIP_GIT_SYNC=1 で fetch+reset を省略（オフライン試験など）
+REM 分岐（divergence）防止のため v1 と同じ fetch + reset --hard 方式に統一。
 setlocal EnableExtensions EnableDelayedExpansion
 set "REPO_ROOT=%~dp0.."
 cd /d "%REPO_ROOT%" || exit /b 1
@@ -10,9 +13,31 @@ if not exist "%LOG_DIR%" mkdir "%LOG_DIR%" 2>nul
 set "LOGFILE=%LOG_DIR%\task-scrape-push.log"
 
 echo.>> "%LOGFILE%"
+echo ===== %date% %time% SESSION START cwd=%CD% =====>> "%LOGFILE%"
+
+if "%SKIP_GIT_SYNC%"=="1" (
+  echo SKIP_GIT_SYNC=1: fetch/reset skipped.>> "%LOGFILE%"
+) else (
+  echo ----- git fetch origin ----- >> "%LOGFILE%"
+  git fetch origin >> "%LOGFILE%" 2>&1
+  set "FETCH_EC=!ERRORLEVEL!"
+  if not "!FETCH_EC!"=="0" (
+    echo git fetch failed code=!FETCH_EC!. Check network/credential. Log: %LOGFILE%
+    exit /b 1
+  )
+  echo ----- git reset --hard origin/main ----- >> "%LOGFILE%"
+  REM リモートと強制同期。ローカルの未コミット変更や独立コミットは破棄される。
+  git reset --hard origin/main >> "%LOGFILE%" 2>&1
+  set "RESET_EC=!ERRORLEVEL!"
+  if not "!RESET_EC!"=="0" (
+    echo git reset failed code=!RESET_EC!. Log: %LOGFILE%
+    exit /b 1
+  )
+)
+
 echo ===== %date% %time% SCRAPE START =====>> "%LOGFILE%"
 echo cwd=%CD%>> "%LOGFILE%"
-call npx tsx src/app.ts --scrape >> "%LOGFILE%" 2>&1
+call npm run scrape >> "%LOGFILE%" 2>&1
 set "SCRAPE_EC=!ERRORLEVEL!"
 echo ===== SCRAPE END code=!SCRAPE_EC! =====>> "%LOGFILE%"
 if not "!SCRAPE_EC!"=="0" (
@@ -40,7 +65,7 @@ if not "!COMMIT_EC!"=="0" (
   echo git commit failed code=!COMMIT_EC!. Set: git config --global user.name / user.email>> "%LOGFILE%"
   exit /b 1
 )
-git push origin main >> "%LOGFILE%" 2>&1
+git push origin HEAD >> "%LOGFILE%" 2>&1
 set "PUSH_EC=!ERRORLEVEL!"
 if not "!PUSH_EC!"=="0" (
   echo git push failed code=!PUSH_EC!. Check credential or network.>> "%LOGFILE%"
