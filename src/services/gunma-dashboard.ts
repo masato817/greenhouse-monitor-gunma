@@ -3,6 +3,7 @@ import path from 'path';
 import handlebars from 'handlebars';
 import { EnvironmentData, WateringGuideMark } from '../types';
 import { logger, formatJapanese, getEnv } from '../utils';
+import { calculateLedMJ, calculateWateringGuide as calculateWateringGuideShared } from './watering-guide';
 import { GoogleSheetsService } from './sheets';
 import { HistoryAnalyzer } from './history-analyzer';
 
@@ -95,39 +96,7 @@ export class GunmaDashboardGenerator {
                 house9: dataList.find(d => d.location.includes('9号')) || {},
             };
 
-            // LED累積計算ヘルパー
-            const calculateLedMJ = (lightingStart: string | undefined, lightingEnd: string | undefined, timestamp: Date): number => {
-                const COEFF_LED = 0.09;
-                if (!lightingStart || !lightingEnd) return 0;
-
-                const parseToMin = (t: string) => {
-                    const parts = t.split(':');
-                    if (parts.length === 2) return parseInt(parts[0]) * 60 + parseInt(parts[1]);
-                    return 0;
-                };
-
-                const s = parseToMin(lightingStart);
-                const e = parseToMin(lightingEnd);
-                // getHours() は実行環境のTZに依存するため、JST固定で現在分を求める
-                const [nowH, nowM] = formatJapanese(timestamp, 'HH:mm').split(':').map(Number);
-                const currentMin = nowH * 60 + nowM;
-
-                // 点灯済みの分数。開始 > 終了 は日跨ぎ点灯（例: 22:00→06:00）
-                let litMin = 0;
-                if (s < e) {
-                    // 同日内: 開始前は0、点灯中は経過分、消灯後は全点灯時間
-                    litMin = currentMin > s ? Math.min(currentMin, e) - s : 0;
-                } else if (s > e) {
-                    if (currentMin >= s) {
-                        litMin = currentMin - s; // 当日の点灯開始後
-                    } else if (currentMin < e) {
-                        litMin = (1440 - s) + currentMin; // 前日から続く早朝の点灯中
-                    } else {
-                        litMin = (1440 - s) + e; // 消灯後: 全点灯時間
-                    }
-                }
-                return (litMin / 60) * COEFF_LED;
-            };
+            // LED累積計算は watering-guide.ts の共通実装 calculateLedMJ を使用
 
             const sheetsService = new GoogleSheetsService();
 
@@ -265,203 +234,11 @@ export class GunmaDashboardGenerator {
         history: EnvironmentData[],
         lightingConfig: { start?: string, end?: string } | null = null
     ): any {
-        if (!refHouseData || !refHouseData.sunrise || !refHouseData.sunset) {
-            return { error: '日の出・日の入データなし' };
-        }
-
-        const parseTime = (str: string | undefined): number | null => {
-            if (!str) return null;
-            let timeStr = str;
-            if (str.length > 10) {
-                const match = str.match(/(\d{1,2}:\d{2})/);
-                if (match) timeStr = match[1];
-                else {
-                    const d = new Date(str);
-                    if (!isNaN(d.getTime())) {
-                        timeStr = `${d.getHours()}:${d.getMinutes()}`;
-                    }
-                }
-            }
-            if (timeStr.indexOf(':') === -1) return null;
-            const parts = timeStr.split(':');
-            return parseInt(parts[0]) * 60 + parseInt(parts[1]);
-        };
-
-        const formatTime = (min: number): string => {
-            const h = Math.floor(min / 60);
-            const m = min % 60;
-            return (h < 10 ? '0' + h : h) + ':' + (m < 10 ? '0' + m : m);
-        };
-
-        const sunriseTime = parseTime(refHouseData.sunrise);
-        const sunsetTime = parseTime(refHouseData.sunset);
-
-        if (sunriseTime === null || sunsetTime === null) {
-            return { error: '時間形式エラー', rawSunrise: refHouseData.sunrise, rawSunset: refHouseData.sunset };
-        }
-
-        const endTime = sunsetTime - (4 * 60);
-        const intervalMJ = 1.0;
-
-        const today = new Date();
-
-        // 基準ハウス(8号) の当日履歴を抽出
-        const refHistory = history.filter(d =>
-            d.location.includes('8号') &&
-            d.timestamp.getFullYear() === today.getFullYear() &&
-            d.timestamp.getMonth() === today.getMonth() &&
-            d.timestamp.getDate() === today.getDate()
-        );
-        logger.info(`[Gunma] WateringGuide: Today's 8号 history count: ${refHistory.length}`);
-
-        if (refHistory.length === 0) {
-            return {
-                error: 'データ待機中',
-                sunrise: refHouseData.sunrise,
-                sunset: refHouseData.sunset,
-                endTime: formatTime(endTime)
-            };
-        }
-
-        refHistory.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-
-        const guideTimes: any[] = [];
-        const COEFF_LED = 0.09;
-        const calculateEffectiveMJ = (solarMJ: number, timestamp: Date): number => {
-            let ledMJ = 0;
-            if (lightingConfig && lightingConfig.start && lightingConfig.end) {
-                const s = parseTime(lightingConfig.start);
-                const e = parseTime(lightingConfig.end);
-                if (s !== null && e !== null) {
-                    const currentMin = timestamp.getHours() * 60 + timestamp.getMinutes();
-                    if (currentMin > s) {
-                        const effectiveEnd = Math.min(currentMin, e);
-                        if (effectiveEnd > s) {
-                            const durationHour = (effectiveEnd - s) / 60;
-                            ledMJ = durationHour * COEFF_LED;
-                        }
-                    }
-                }
-            }
-            return solarMJ + ledMJ;
-        };
-
-        let validStartFound = false;
-        const endTimeExtended = endTime + 30;
-        let currentTargetMJ = 1.0;
-        const searchStartOffset = 0.4;
-        let provisional: { data: EnvironmentData, min: number, effectiveMJ: number, distanceToTarget: number } | null = null;
-
-        for (let i = 0; i < refHistory.length; i++) {
-            const d = refHistory[i];
-            const min = d.timestamp.getHours() * 60 + d.timestamp.getMinutes();
-            const rawMJ = d.accumulatedSolarRadiation;
-
-            if (rawMJ === undefined || rawMJ === null) continue;
-            if (min > endTimeExtended) break;
-
-            const effectiveMJ = calculateEffectiveMJ(rawMJ, d.timestamp);
-            const nextTargetSearchStart = currentTargetMJ + 1.0 - searchStartOffset;
-
-            if (effectiveMJ >= nextTargetSearchStart) {
-                if (provisional) {
-                    validStartFound = true;
-                    guideTimes.push({
-                        time: formatTime(provisional.min),
-                        mj: provisional.effectiveMJ,
-                        type: guideTimes.length === 0 ? 'start' : 'water',
-                        diff: parseFloat((provisional.effectiveMJ - currentTargetMJ).toFixed(1))
-                    });
-                    provisional = null;
-                }
-                currentTargetMJ += intervalMJ;
-                while (effectiveMJ >= currentTargetMJ + 1.0 - searchStartOffset) {
-                    currentTargetMJ += intervalMJ;
-                }
-            }
-
-            const currentSearchStart = currentTargetMJ - searchStartOffset;
-
-            if (effectiveMJ >= currentSearchStart) {
-                const distanceToTarget = Math.abs(effectiveMJ - currentTargetMJ);
-
-                if (!provisional) {
-                    provisional = { data: d, min: min, effectiveMJ: effectiveMJ, distanceToTarget: distanceToTarget };
-                } else {
-                    if (distanceToTarget < provisional.distanceToTarget) {
-                        provisional = { data: d, min: min, effectiveMJ: effectiveMJ, distanceToTarget: distanceToTarget };
-                    }
-                }
-            }
-        }
-
-        if (provisional) {
-            validStartFound = true;
-            guideTimes.push({
-                time: formatTime(provisional.min),
-                mj: provisional.effectiveMJ,
-                type: guideTimes.length === 0 ? 'start' : 'water',
-                diff: parseFloat((provisional.effectiveMJ - currentTargetMJ).toFixed(1))
-            });
-        }
-
-        if (guideTimes.length > 0) {
-            guideTimes[guideTimes.length - 1].isFinal = true;
-        }
-
-        // 基準日射 (日没 -4H 付近)
-        let referenceMJ = 0;
-        let refDiff = 9999;
-        for (const d of refHistory) {
-            const min = d.timestamp.getHours() * 60 + d.timestamp.getMinutes();
-            const currentMJ = d.accumulatedSolarRadiation;
-            if (currentMJ !== undefined && currentMJ !== null) {
-                const diff = Math.abs(min - endTime);
-                if (diff < refDiff) {
-                    refDiff = diff;
-                    referenceMJ = calculateEffectiveMJ(currentMJ, d.timestamp);
-                }
-            }
-        }
-
-        // 現況 (最新測定)
-        let currentStatus = null;
-        if (refHistory.length > 0) {
-            const lastData = refHistory[refHistory.length - 1];
-            const lastMin = lastData.timestamp.getHours() * 60 + lastData.timestamp.getMinutes();
-            if (lastMin <= endTimeExtended) {
-                const currentMJ = lastData.accumulatedSolarRadiation;
-                if (currentMJ !== undefined && currentMJ !== null) {
-                    const currentSolarMJ = lastData.accumulatedSolarRadiation || 0;
-                    const currentEffectiveMJ = calculateEffectiveMJ(currentSolarMJ, lastData.timestamp);
-
-                    let targetBase = 1.0;
-                    if (guideTimes.length > 0) {
-                        targetBase = currentTargetMJ;
-                    }
-
-                    currentStatus = {
-                        currentMJ: parseFloat(currentEffectiveMJ.toFixed(1)),
-                        nextTarget: parseFloat(targetBase.toFixed(1)),
-                        progress: parseFloat((currentEffectiveMJ - (targetBase - intervalMJ)).toFixed(1))
-                    };
-                }
-            }
-        }
-
-        // validStartFound は guideTimes の非空と同義のため未使用警告回避
-        void validStartFound;
-
-        const startTime = sunriseTime + (2 * 60);
-
-        return {
-            times: guideTimes,
-            sunrise: refHouseData.sunrise,
-            sunset: refHouseData.sunset,
-            startTime: formatTime(startTime),
-            endTime: formatTime(endTime),
-            currentStatus: currentStatus,
-            referenceMJ: referenceMJ
-        };
+        // 群馬: 8号棟を基準ハウスとして共通ロジックで計算する
+        return calculateWateringGuideShared(refHouseData, history, lightingConfig, {
+            refHouseFilter: d => d.location.includes('8号'),
+            logPrefix: '[Gunma] ',
+        });
     }
+
 }
