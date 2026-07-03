@@ -1,7 +1,7 @@
 import { google, sheets_v4 } from 'googleapis';
 import { GoogleAuth } from 'google-auth-library';
 import { EnvironmentData, WateringGuideMark, WateringGuideHistory, ThresholdConfig, ThresholdMap } from '../types';
-import { logger, getEnvOrThrow, getEnv, formatJapanese, Farm, ALL_FARMS, resolveFarm } from '../utils';
+import { logger, getEnvOrThrow, getEnv, formatJapanese, parseJstTimestamp, Farm, ALL_FARMS, resolveFarm } from '../utils';
 
 /**
  * シートのプロパティ型（簡易定義）
@@ -325,8 +325,8 @@ export class GoogleSheetsService {
     const location = row[2];
     if (!timestampStr || !location) return null;
 
-    const timestamp = new Date(timestampStr);
-    if (isNaN(timestamp.getTime())) return null;
+    const timestamp = parseJstTimestamp(timestampStr);
+    if (!timestamp) return null;
 
     return {
       timestamp,
@@ -727,8 +727,8 @@ export class GoogleSheetsService {
       for (let i = 0; i < rows.length; i++) {
         const timestampStr = rows[i][0];
         if (!timestampStr) continue;
-        const date = new Date(timestampStr);
-        if (!isNaN(date.getTime()) && date < cutoffDate) {
+        const date = parseJstTimestamp(timestampStr);
+        if (date && date < cutoffDate) {
           deleteCount++;
         } else {
           break; // 古い順なので終了
