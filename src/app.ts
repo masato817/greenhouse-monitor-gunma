@@ -15,9 +15,12 @@ dotenv.config();
 /**
  * メイン処理：データ取得→保存→異常チェック→通知
  */
-async function main(): Promise<void> {
+async function main(): Promise<string[]> {
   logger.info('=== 環境モニタリング開始 ===');
 
+  // 各工程の失敗を集約する。フォールバックのため処理は継続するが、
+  // 単発実行（--scrape）では戻り値を exit code に反映して障害検知可能にする
+  const failures: string[] = [];
   const allData: EnvironmentData[] = [];
 
   // プロファインダーからデータ取得
@@ -40,6 +43,7 @@ async function main(): Promise<void> {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error(`プロファインダーエラー: ${errorMessage}`);
+    failures.push(`プロファインダー: ${errorMessage}`);
   }
 
   // プロファームからデータ取得（1号棟=静岡サングレイス, env 未設定時スキップ）
@@ -66,12 +70,14 @@ async function main(): Promise<void> {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(`プロファームエラー: ${errorMessage}`);
+      failures.push(`プロファーム: ${errorMessage}`);
     }
   }
 
   // データが取得できなかった場合
   if (allData.length === 0) {
     logger.error('データが取得できませんでした');
+    failures.push('スクレイピング: 全ソースで取得0件');
 
     // エラー通知を送信するが、処理は続行する（スプレッドシートからの補完を試みるため）
     const lineService = new LineMessagingService();
@@ -116,6 +122,7 @@ async function main(): Promise<void> {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error(`Sheets処理エラー: ${errorMessage}`);
+    failures.push(`Sheets処理: ${errorMessage}`);
   }
 
   // 静岡ダッシュボード生成 (index.html): 既存のリッチ版
@@ -129,6 +136,7 @@ async function main(): Promise<void> {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error(`静岡ダッシュボード生成エラー: ${errorMessage}`);
+    failures.push(`静岡ダッシュボード生成: ${errorMessage}`);
   }
 
   // 群馬ダッシュボード生成 (gunma.html): 静岡と同等のリッチ版
@@ -142,6 +150,7 @@ async function main(): Promise<void> {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error(`群馬ダッシュボード生成エラー: ${errorMessage}`);
+    failures.push(`群馬ダッシュボード生成: ${errorMessage}`);
   }
 
   // 異常値チェック
@@ -151,12 +160,18 @@ async function main(): Promise<void> {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error(`異常値チェックエラー: ${errorMessage}`);
+    failures.push(`異常値チェック: ${errorMessage}`);
   }
 
   // 注: 定期レポートは廃止。異常時のみAlertCheckerからLINE通知を送信。
   // 詳細はダッシュボード（GitHub Pages）で確認可能。
 
-  logger.info('=== 環境モニタリング完了 ===\n');
+  if (failures.length > 0) {
+    logger.error(`=== 環境モニタリング完了（失敗 ${failures.length} 件: ${failures.join(' / ')}） ===\n`);
+  } else {
+    logger.info('=== 環境モニタリング完了 ===\n');
+  }
+  return failures;
 }
 
 /**
@@ -204,7 +219,7 @@ const args = process.argv.slice(2);
 if (args.includes('--scrape')) {
   // 単発実行モード
   main()
-    .then(() => process.exit(0))
+    .then(failures => process.exit(failures.length > 0 ? 1 : 0))
     .catch(err => {
       logger.error(`実行エラー: ${err}`);
       process.exit(1);
