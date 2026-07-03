@@ -108,16 +108,25 @@ export class GunmaDashboardGenerator {
 
                 const s = parseToMin(lightingStart);
                 const e = parseToMin(lightingEnd);
-                const currentMin = timestamp.getHours() * 60 + timestamp.getMinutes();
+                // getHours() は実行環境のTZに依存するため、JST固定で現在分を求める
+                const [nowH, nowM] = formatJapanese(timestamp, 'HH:mm').split(':').map(Number);
+                const currentMin = nowH * 60 + nowM;
 
-                let durationHour = 0;
-                if (currentMin > s) {
-                    const effectiveEnd = Math.min(currentMin, e);
-                    if (effectiveEnd > s) {
-                        durationHour = (effectiveEnd - s) / 60;
+                // 点灯済みの分数。開始 > 終了 は日跨ぎ点灯（例: 22:00→06:00）
+                let litMin = 0;
+                if (s < e) {
+                    // 同日内: 開始前は0、点灯中は経過分、消灯後は全点灯時間
+                    litMin = currentMin > s ? Math.min(currentMin, e) - s : 0;
+                } else if (s > e) {
+                    if (currentMin >= s) {
+                        litMin = currentMin - s; // 当日の点灯開始後
+                    } else if (currentMin < e) {
+                        litMin = (1440 - s) + currentMin; // 前日から続く早朝の点灯中
+                    } else {
+                        litMin = (1440 - s) + e; // 消灯後: 全点灯時間
                     }
                 }
-                return durationHour * COEFF_LED;
+                return (litMin / 60) * COEFF_LED;
             };
 
             const sheetsService = new GoogleSheetsService();
