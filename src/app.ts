@@ -174,6 +174,25 @@ async function main(): Promise<string[]> {
   return failures;
 }
 
+// 多重実行ガード: スクレイピングが実行間隔を超えて長引いた場合に、
+// Puppeteer 起動・Sheets 書込・HTML 生成が並行しないよう実行中はスキップする
+let isMainRunning = false;
+
+async function runMainExclusive(trigger: string): Promise<void> {
+  if (isMainRunning) {
+    logger.warn(`前回の処理が実行中のため今回はスキップします (${trigger})`);
+    return;
+  }
+  isMainRunning = true;
+  try {
+    await main();
+  } catch (err) {
+    logger.error(`${trigger}エラー: ${err}`);
+  } finally {
+    isMainRunning = false;
+  }
+}
+
 /**
  * 定期実行モード
  */
@@ -187,11 +206,11 @@ function startScheduler(): void {
   logger.info(`cron式: ${cronExpression}`);
 
   // 起動時に1回実行
-  main().catch(err => logger.error(`初回実行エラー: ${err}`));
+  void runMainExclusive('初回実行');
 
   // 定期実行
   cron.schedule(cronExpression, () => {
-    main().catch(err => logger.error(`定期実行エラー: ${err}`));
+    void runMainExclusive('定期実行');
   });
 
   // 日次クリーンアップ（毎日 0:00）
