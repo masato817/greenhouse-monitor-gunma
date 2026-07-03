@@ -13,14 +13,10 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 /**
- * メイン処理：データ取得→保存→異常チェック→通知
+ * スクレイピング: プロファインダー + プロファーム からデータ取得
+ * 失敗はログと failures への集約に留め、取得できた分のみ返す
  */
-async function main(): Promise<string[]> {
-  logger.info('=== 環境モニタリング開始 ===');
-
-  // 各工程の失敗を集約する。フォールバックのため処理は継続するが、
-  // 単発実行（--scrape）では戻り値を exit code に反映して障害検知可能にする
-  const failures: string[] = [];
+async function scrapeAllSources(failures: string[]): Promise<EnvironmentData[]> {
   const allData: EnvironmentData[] = [];
 
   // プロファインダーからデータ取得
@@ -74,22 +70,35 @@ async function main(): Promise<string[]> {
     }
   }
 
-  // データが取得できなかった場合
-  if (allData.length === 0) {
-    logger.error('データが取得できませんでした');
-    failures.push('スクレイピング: 全ソースで取得0件');
+  return allData;
+}
 
-    // エラー通知を送信するが、処理は続行する（スプレッドシートからの補完を試みるため）
-    const lineService = new LineMessagingService();
-    try {
-      await lineService.send('\n⚠️ データ取得エラー\nスクレイピングでデータを取得できませんでした。スプレッドシートからの補完を試みます。');
-    } catch (e) {
-      logger.error(`LINE通知エラー: ${e}`);
-    }
-    // return; // 削除: ここで止まらず、Sheetsからの読み込みへ進む
+/**
+ * スクレイプ結果0件の通知（処理は継続し、Sheetsからの補完を試みる）
+ */
+async function notifyEmptyScrape(failures: string[]): Promise<void> {
+  logger.error('データが取得できませんでした');
+  failures.push('スクレイピング: 全ソースで取得0件');
+
+  const lineService = new LineMessagingService();
+  try {
+    await lineService.send('\n⚠️ データ取得エラー\nスクレイピングでデータを取得できませんでした。スプレッドシートからの補完を試みます。');
+  } catch (e) {
+    logger.error(`LINE通知エラー: ${e}`);
   }
+}
 
-  // Google Sheetsに保存 & 最新データ取得 (農場別振分け)
+interface FarmSheetData {
+  shizuokaData: EnvironmentData[];
+  gunmaData: EnvironmentData[];
+  shizuokaHistory: EnvironmentData[];
+  gunmaHistory: EnvironmentData[];
+}
+
+/**
+ * Google Sheetsに保存し、ダッシュボード用の最新データ・履歴を農場別に取得する
+ */
+async function saveAndFetchSheetData(allData: EnvironmentData[], failures: string[]): Promise<FarmSheetData> {
   let shizuokaData: EnvironmentData[] = [];
   let gunmaData: EnvironmentData[] = [];
   let shizuokaHistory: EnvironmentData[] = [];
@@ -125,6 +134,15 @@ async function main(): Promise<string[]> {
     failures.push(`Sheets処理: ${errorMessage}`);
   }
 
+  return { shizuokaData, gunmaData, shizuokaHistory, gunmaHistory };
+}
+
+/**
+ * 静岡・群馬のダッシュボード HTML を生成する
+ */
+async function generateDashboards(sheetData: FarmSheetData, failures: string[]): Promise<void> {
+  const { shizuokaData, gunmaData, shizuokaHistory, gunmaHistory } = sheetData;
+
   // 静岡ダッシュボード生成 (index.html): 既存のリッチ版
   try {
     if (shizuokaData.length > 0) {
@@ -152,8 +170,14 @@ async function main(): Promise<string[]> {
     logger.error(`群馬ダッシュボード生成エラー: ${errorMessage}`);
     failures.push(`群馬ダッシュボード生成: ${errorMessage}`);
   }
+}
 
-  // 異常値チェック
+/**
+ * 異常値チェックと通知
+ * 注: 定期レポートは廃止。異常時のみAlertCheckerからLINE通知を送信。
+ * 詳細はダッシュボード（GitHub Pages）で確認可能。
+ */
+async function checkAlerts(allData: EnvironmentData[], failures: string[]): Promise<void> {
   try {
     const alertChecker = new AlertChecker();
     await alertChecker.checkAndNotify(allData);
@@ -162,9 +186,25 @@ async function main(): Promise<string[]> {
     logger.error(`異常値チェックエラー: ${errorMessage}`);
     failures.push(`異常値チェック: ${errorMessage}`);
   }
+}
 
-  // 注: 定期レポートは廃止。異常時のみAlertCheckerからLINE通知を送信。
-  // 詳細はダッシュボード（GitHub Pages）で確認可能。
+/**
+ * メイン処理: データ取得 → 保存 → ダッシュボード生成 → 異常チェック
+ * 各工程の失敗はログと戻り値に集約する。フォールバックのため処理は継続するが、
+ * 単発実行（--scrape）では戻り値を exit code に反映して障害検知可能にする
+ */
+async function main(): Promise<string[]> {
+  logger.info('=== 環境モニタリング開始 ===');
+  const failures: string[] = [];
+
+  const allData = await scrapeAllSources(failures);
+  if (allData.length === 0) {
+    await notifyEmptyScrape(failures);
+  }
+
+  const sheetData = await saveAndFetchSheetData(allData, failures);
+  await generateDashboards(sheetData, failures);
+  await checkAlerts(allData, failures);
 
   if (failures.length > 0) {
     logger.error(`=== 環境モニタリング完了（失敗 ${failures.length} 件: ${failures.join(' / ')}） ===\n`);
