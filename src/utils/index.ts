@@ -115,6 +115,30 @@ export function formatJapanese(
 }
 
 /**
+ * シートに保存された日時文字列を JST として解釈して Date に変換する
+ *
+ * new Date(str) は 'yyyy/MM/dd HH:mm:ss' 形式を実行環境のローカル時刻として
+ * 解釈するため、UTC で動く GitHub Actions では JST 保存値が9時間ずれる。
+ * オフセット情報を持たない日付文字列は JST 固定で解釈し、環境差をなくす。
+ * @returns 変換できない場合は null
+ */
+export function parseJstTimestamp(str: string): Date | null {
+  if (!str) return null;
+
+  // 'yyyy/M/d H:mm(:ss)' 形式（formatJapanese / toLocaleString('ja-JP') の出力）
+  const m = str.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/);
+  if (m) {
+    const [, y, mo, d, h, mi, s] = m;
+    // JST = UTC+9 なので、時から9を引いた UTC 時刻として構築する（負数は前日に繰り下がる）
+    return new Date(Date.UTC(+y, +mo - 1, +d, +h - 9, +mi, s ? +s : 0));
+  }
+
+  // ISO 8601 などオフセット情報を含む形式はそのままパース
+  const date = new Date(str);
+  return isNaN(date.getTime()) ? null : date;
+}
+
+/**
  * 数値を指定桁数で丸める
  * @param value 数値
  * @param decimals 小数点以下の桁数
