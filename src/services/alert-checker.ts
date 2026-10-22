@@ -1,5 +1,5 @@
 import { EnvironmentData, ThresholdConfig, ThresholdMap } from '../types';
-import { logger, roundTo, resolveHouseName } from '../utils';
+import { logger, roundTo, resolveHouseName, formatJapanese, parseJstTimestamp } from '../utils';
 import { GoogleSheetsService } from './sheets';
 import { LineMessagingService } from './line-messaging';
 
@@ -243,8 +243,8 @@ export class AlertChecker {
         const key = row[1];
         if (!timestampStr || !key) continue;
 
-        const ts = new Date(timestampStr);
-        if (isNaN(ts.getTime())) continue;
+        const ts = parseJstTimestamp(timestampStr);
+        if (!ts) continue;
 
         const existing = this.lastAlertTimes.get(key);
         if (!existing || ts > existing) {
@@ -268,7 +268,7 @@ export class AlertChecker {
       const spreadsheetId = this.sheetsService.getSpreadsheetId();
 
       const rows = alerts.map(a => [
-        timestamp.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }),
+        formatJapanese(timestamp, 'yyyy/MM/dd HH:mm:ss'),
         `${a.location}-${a.item}`,
         a.location,
         a.itemDisplayName,
