@@ -5,6 +5,7 @@ import { getEnvOrThrow } from '../utils';
 export class ProfarmScraper extends BaseScraper {
   async scrape(): Promise<EnvironmentData[]> {
     const results: EnvironmentData[] = [];
+    this.lastError = null;
 
     try {
       await this.initialize();
@@ -24,7 +25,7 @@ export class ProfarmScraper extends BaseScraper {
       // Navigate directly to ensure we are on the right page
       // 環境変数から取得（ハウスID等の業務固有値はリポジトリに埋め込まない）
       const realtimeUrl = getEnvOrThrow('PROFARM_REALTIME_URL');
-      await this.page.goto(realtimeUrl, { waitUntil: 'domcontentloaded' });
+      await this.gotoChecked(realtimeUrl, 'Profarm realtime');
       // Discovery Mode: Log all interesting IDs
       try {
         const ids = await this.page.$$eval('*[id]', els =>
@@ -67,6 +68,7 @@ export class ProfarmScraper extends BaseScraper {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       this.logger.error(`Profarm scraping fatal error: ${msg}`);
+      this.recordError(msg);
       await this.takeScreenshot('fatal-error-profarm');
     } finally {
       await this.close();
@@ -79,7 +81,7 @@ export class ProfarmScraper extends BaseScraper {
     if (!this.page) return;
 
     this.logger.info('Logging in to Profarm...');
-    await this.page.goto(this.config.url, { waitUntil: 'domcontentloaded' });
+    await this.gotoChecked(this.config.url, 'Profarm login');
 
     const userSelector = '#userId';
     const passSelector = '#password';
@@ -103,11 +105,9 @@ export class ProfarmScraper extends BaseScraper {
       try {
         await this.page.waitForSelector('#ddlhb0201u a', { timeout: 10000 });
       } catch (e) {
-        const url = this.page.url();
-        const html = await this.page.content();
-        this.logger.error(`Login verification failed on ${url}`);
-
-        throw new Error(`Login failed: Menu element not found on ${url}`);
+        // 公開リポジトリの CI ログに残るため URL は出さない
+        this.logger.error('Login verification failed (menu element not found)');
+        throw new Error('Login failed: Menu element not found');
       }
       this.logger.info('Login submitted and verified.');
     } catch (e) {

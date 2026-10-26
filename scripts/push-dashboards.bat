@@ -6,6 +6,8 @@ cd /d "%REPO_ROOT%" || exit /b 1
 
 git add public/index.html public/gunma.html
 if errorlevel 1 exit /b 1
+if exist public\status.json git add public/status.json
+if errorlevel 1 exit /b 1
 git diff --cached --quiet
 if %ERRORLEVEL% equ 0 (
   echo No changes in public dashboards. Nothing to push.

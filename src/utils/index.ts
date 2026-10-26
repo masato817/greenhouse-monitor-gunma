@@ -115,6 +115,14 @@ export function formatJapanese(
 }
 
 /**
+ * JST オフセット付き ISO 8601 文字列に変換する（例: 2026-10-26T14:10:05+09:00）
+ * status.json やページ埋め込み用。ブラウザ・date コマンドの双方で解釈できる形式
+ */
+export function formatIsoJst(date: Date): string {
+  return formatInTimeZone(date, JST, "yyyy-MM-dd'T'HH:mm:ssXXX");
+}
+
+/**
  * シートに保存された日時文字列を JST として解釈して Date に変換する
  *
  * new Date(str) は 'yyyy/MM/dd HH:mm:ss' 形式を実行環境のローカル時刻として

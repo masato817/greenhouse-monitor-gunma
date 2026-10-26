@@ -4,8 +4,9 @@ import handlebars from 'handlebars';
 import { EnvironmentData, WateringGuideMark, ThresholdMap } from '../types';
 import { logger, formatJapanese, getEnv } from '../utils';
 import { calculateLedMJ, calculateWateringGuide as calculateWateringGuideShared } from './watering-guide';
-import { GoogleSheetsService } from './sheets';
 import { HistoryAnalyzer } from './history-analyzer';
+import { buildFreshness } from './freshness';
+import { DashboardGeneratorOptions, GenerateOptions, GenerateResult, SheetsAccessor } from './dashboard-common';
 
 // Handlebarsヘルパーを一度だけ登録するためのフラグ
 let helpersRegistered = false;
@@ -71,16 +72,26 @@ export class DashboardGenerator {
     private templatePath: string;
     private outputPath: string;
 
-    constructor() {
-        this.templatePath = path.join(process.cwd(), 'src', 'templates', 'index.hbs');
-        this.outputPath = path.join(process.cwd(), 'public', 'index.html');
+    constructor(options: DashboardGeneratorOptions = {}) {
+        this.templatePath = options.templatePath ?? path.join(process.cwd(), 'src', 'templates', 'index.hbs');
+        this.outputPath = options.outputPath ?? path.join(process.cwd(), 'public', 'index.html');
 
         // ヘルパーを登録
         registerHandlebarsHelpers();
     }
 
-    async generate(dataList: EnvironmentData[], historyList: EnvironmentData[] = []): Promise<void> {
+    /**
+     * index.html を生成する
+     * Sheets 操作の失敗は既定値で続行して GenerateResult.sheetsErrors に返し、
+     * テンプレート読込・書込の失敗は例外として呼び出し側に伝える
+     */
+    async generate(
+        dataList: EnvironmentData[],
+        historyList: EnvironmentData[] = [],
+        options: GenerateOptions = {}
+    ): Promise<GenerateResult> {
         logger.info(`Generating dashboard HTML with Watering Guide... History count: ${historyList.length}`);
+        const now = options.now ?? new Date();
 
         try {
             // Load template
@@ -88,22 +99,23 @@ export class DashboardGenerator {
             const template = handlebars.compile(templateContent);
 
             // Group data by location (simple mapping for now)
+            // 表示用に設定値を書き足すため、呼び出し元のデータを変更しないようコピーする
             const houses: any = {
                 // 1号棟はProfarmデータ、または名前で検索
-                house1: dataList.find(d => d.source === 'profarm') || dataList.find(d => d.location.includes('1号')) || {},
-                house2: dataList.find(d => d.location.includes('2号')) || {},
-                house3: dataList.find(d => d.location.includes('3号')) || {},
-                house4: dataList.find(d => d.location.includes('4号')) || {},
+                house1: { ...(dataList.find(d => d.source === 'profarm') || dataList.find(d => d.location.includes('1号'))) },
+                house2: { ...dataList.find(d => d.location.includes('2号')) },
+                house3: { ...dataList.find(d => d.location.includes('3号')) },
+                house4: { ...dataList.find(d => d.location.includes('4号')) },
             };
 
             // LED累積計算は watering-guide.ts の共通実装 calculateLedMJ を使用
 
-            // Initialize Sheets Service early
-            const sheetsService = new GoogleSheetsService();
+            // Sheets は失敗しても既定値で続行する（権限喪失時もページ生成を止めない）
+            const sheets = new SheetsAccessor(options.sheets);
 
             // Load House Configs FIRST to ensure lighting times are available for calculation
-            const houseConfigs = await sheetsService.getHouseConfigs();
-            const currentMonth = new Date().getMonth() + 1; // 1-12
+            const houseConfigs = await sheets.call('ハウス設定読込', new Map(), s => s.getHouseConfigs());
+            const currentMonth = now.getMonth() + 1; // 1-12
             logger.info(`Current month for threshold check: ${currentMonth}`);
             logger.info(`House Configs: ${JSON.stringify(Array.from(houseConfigs.entries()))}`);
 
@@ -128,7 +140,7 @@ export class DashboardGenerator {
                 }
 
                 // Calculate LED Accumulation for display
-                houses[key].ledAccumulation = calculateLedMJ(houses[key].lightingStartTime, houses[key].lightingEndTime, new Date());
+                houses[key].ledAccumulation = calculateLedMJ(houses[key].lightingStartTime, houses[key].lightingEndTime, now);
             }
 
             // Watering Guide Calculation
@@ -137,11 +149,11 @@ export class DashboardGenerator {
                 start: houses.house1?.lightingStartTime,
                 end: houses.house1?.lightingEndTime
             };
-            const wateringGuide = this.calculateWateringGuide(houses.house2, historyList, h1Config);
+            const wateringGuide = this.calculateWateringGuide(houses.house2, historyList, h1Config, now);
 
             // 潅水目安をスプシに保存
             if (wateringGuide && wateringGuide.times && wateringGuide.times.length > 0) {
-                const today = new Date();
+                const today = now;
                 const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
                 const marks: WateringGuideMark[] = wateringGuide.times.map((t: any, index: number) => ({
@@ -160,15 +172,15 @@ export class DashboardGenerator {
                     dailyTotalSolar = houses.house1.accumulatedSolarRadiation;
                 }
 
-                await sheetsService.saveWateringGuide('静岡', dateStr, marks, dailyTotalSolar);
+                await sheets.call('潅水目安保存', undefined, s => s.saveWateringGuide('静岡', dateStr, marks, dailyTotalSolar));
             }
 
             // 過去7日分の履歴を読み込み (静岡)
-            const wateringGuideHistory = await sheetsService.getWateringGuideHistory('静岡', 7);
+            const wateringGuideHistory = await sheets.call('潅水目安履歴読込', [], s => s.getWateringGuideHistory('静岡', 7));
 
             // 異常期間の分析
             let anomalyPeriods: any[] = [];
-            const thresholds = await sheetsService.getThresholds();
+            const thresholds = await sheets.call('閾値読込', {}, s => s.getThresholds());
 
             // app.ts 側で getRawHistoryData(10080)（1週間分）を取得済みのため、
             // ここでは再取得せず渡された historyList を再利用する。
@@ -176,14 +188,22 @@ export class DashboardGenerator {
             let rawHistoryForAnalyzer = historyList;
             if (rawHistoryForAnalyzer.length < 1000) {
                 logger.info(`historyList件数不足(${rawHistoryForAnalyzer.length})のため、静岡1000件を再取得します`);
-                rawHistoryForAnalyzer = await sheetsService.getRawHistoryData(1000, '静岡');
+                rawHistoryForAnalyzer = await sheets.call('履歴再取得', historyList, s => s.getRawHistoryData(1000, '静岡'));
             }
             const analyzer = new HistoryAnalyzer();
             anomalyPeriods = analyzer.analyze(rawHistoryForAnalyzer, thresholds);
 
+            // ヘッダの「最終」は実行時刻ではなく表示データ自体の計測時刻にする
+            const freshness = buildFreshness([
+                { label: '1号棟', data: houses.house1 },
+                { label: '2号棟', data: houses.house2 },
+                { label: '3号棟', data: houses.house3 },
+                { label: '4号棟', data: houses.house4 },
+            ], now);
 
             const viewData = {
-                updatedAt: formatJapanese(new Date(), 'yy/MM/dd HH:mm'),
+                updatedAt: freshness.updatedAt,
+                freshness: freshness,
                 houses: houses,
                 wateringGuide: wateringGuide,
                 wateringGuideHistory: wateringGuideHistory,
@@ -255,16 +275,19 @@ export class DashboardGenerator {
             await fs.writeFile(this.outputPath, html, 'utf-8');
             logger.info(`Dashboard generated at ${this.outputPath}`);
 
+            return { outputPath: this.outputPath, dataTime: freshness.dataTime, sheetsErrors: sheets.errors };
         } catch (error) {
+            // 生成失敗を握りつぶすと実行結果が成功扱いになるため、呼び出し側へ伝える
             logger.error(`Failed to generate dashboard: ${error}`);
-            // Don't throw, just log, to keep main process alive
+            throw error;
         }
     }
 
-    private calculateWateringGuide(house2Data: EnvironmentData, history: EnvironmentData[], lightingConfig: { start?: string, end?: string } | null = null): any {
+    private calculateWateringGuide(house2Data: EnvironmentData, history: EnvironmentData[], lightingConfig: { start?: string, end?: string } | null = null, now?: Date): any {
         // 静岡: 1号棟(Profarm)を基準ハウスとして共通ロジックで計算する
         return calculateWateringGuideShared(house2Data, history, lightingConfig, {
             refHouseFilter: d => d.location.includes('1号') || d.source === 'profarm',
+            now,
         });
     }
 

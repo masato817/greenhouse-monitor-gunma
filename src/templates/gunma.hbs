@@ -58,6 +58,20 @@
             </div>
         </header>
 
+        <!-- データ鮮度: 生成時点で古ければ表示。ブラウザでも経過時間を再判定する（生成が止まった場合に備える） -->
+        <div id="stale-banner" role="alert"
+            class="mb-2 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800"
+            data-data-time="{{freshness.dataTimeIso}}" data-threshold-min="{{freshness.thresholdMinutes}}"
+            {{#unless freshness.isStale}}{{#unless freshness.staleHouses.length}}style="display:none"{{/unless}}{{/unless}}>
+            <p id="stale-all" class="font-bold" {{#unless freshness.isStale}}style="display:none"{{/unless}}>
+                ⚠ データが古い（最終データ {{freshness.updatedAt}}・<span id="stale-age">{{freshness.ageText}}</span>前）。自動更新が止まっている可能性がある
+            </p>
+            {{#if freshness.staleHouses.length}}
+            <p class="text-xs">⚠ 一部ハウスのデータが古い:
+                {{#each freshness.staleHouses}}{{label}}（{{time}}）{{#unless @last}}、{{/unless}}{{/each}}</p>
+            {{/if}}
+        </div>
+
         <!-- アラートセクション -->
         <div id="alerts" class="mb-6 hidden"></div>
 
@@ -399,6 +413,24 @@
         try {
             localStorage.setItem('greenhouse-dashboard-farm', 'gunma');
         } catch (e) { /* noop */ }
+    </script>
+    <script>
+        // データ時刻からの経過が閾値を超えていたら「データが古い」帯を表示する
+        (function () {
+            var el = document.getElementById('stale-banner');
+            if (!el) return;
+            var t = Date.parse(el.getAttribute('data-data-time') || '');
+            var limit = Number(el.getAttribute('data-threshold-min')) || 60;
+            if (isNaN(t)) return;
+            var min = (Date.now() - t) / 60000;
+            if (min <= limit) return;
+            var age = min < 60 ? Math.floor(min) + '分'
+                : min < 2880 ? Math.floor(min / 60) + '時間'
+                : Math.floor(min / 1440) + '日';
+            document.getElementById('stale-age').textContent = age;
+            document.getElementById('stale-all').style.display = '';
+            el.style.display = '';
+        })();
     </script>
 </body>
 
