@@ -85,8 +85,20 @@ export class ProfinderScraper extends BaseScraper {
       await this.page.click(loginButtonSelector);
       this.logger.info('Login submitted, waiting...');
 
-      // Explicit wait instead of waitForNavigation because of SPA behavior potential
-      await new Promise(r => setTimeout(r, 10000));
+      // ログイン成功の検証: SPA のため waitForNavigation は使えないので、
+      // ダッシュボードのデバイス選択要素が現れることをもって成功と判定する
+      try {
+        await this.page.waitForSelector('#select-device', { timeout: 20000 });
+        this.logger.info('Login success confirmed (#select-device found)');
+      } catch {
+        const stillOnLogin = await this.page.$(userSelector);
+        await this.takeScreenshot('login-failed-profinder');
+        throw new Error(
+          stillOnLogin
+            ? 'Profinder ログイン失敗: ログインフォームが残存（認証エラーの可能性）'
+            : 'Profinder ログイン失敗: ダッシュボードが表示されませんでした'
+        );
+      }
 
     } catch (e) {
       this.logger.error(`Profinder Login failed: ${e}`);
