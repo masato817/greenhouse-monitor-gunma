@@ -1,0 +1,66 @@
+name: Reachability Check
+
+# GitHub ランナー（海外 IP）から ProFinder・ProFarm のログイン画面に届くかだけを確かめる。
+# ログインはしない。公開リポジトリのため URL・ホスト名・レスポンス本文はログに出さない。
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check login pages
+        env:
+          PROFINDER_URL: ${{ secrets.PROFINDER_URL }}
+          PROFARM_URL: ${{ secrets.PROFARM_URL }}
+        run: |
+          set -u
+          failed=0
+
+          describe_curl_error() {
+            case "$1" in
+              6) echo "DNS 解決失敗" ;;
+              7) echo "接続拒否（IP 制限の可能性）" ;;
+              28) echo "タイムアウト（IP 制限で破棄されている可能性）" ;;
+              35) echo "TLS ハンドシェイク失敗" ;;
+              52) echo "空の応答" ;;
+              56) echo "受信中に切断" ;;
+              60) echo "証明書の検証失敗" ;;
+              *) echo "curl エラー $1" ;;
+            esac
+          }
+
+          check() {
+            local name=$1 url=$2 result rc code redirects seconds
+            if [ -z "$url" ]; then
+              echo "::error::${name}: secret 未登録"
+              failed=1
+              return
+            fi
+            # -s で curl のエラー文（ホスト名を含む）を出さず、終了コードと HTTP ステータスだけ使う
+            result=$(curl -s -o /dev/null -L --max-time 30 --retry 2 --retry-delay 5 \
+              -A 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' \
+              -w '%{http_code} %{num_redirects} %{time_total}' "$url" 2>/dev/null)
+            rc=$?
+            read -r code redirects seconds <<< "$result"
+            if [ "$rc" -ne 0 ]; then
+              echo "::error::${name}: 届かない（$(describe_curl_error "$rc")）"
+              failed=1
+            elif [ "${code:-000}" -ge 200 ] && [ "${code:-000}" -lt 400 ]; then
+              echo "${name}: OK（HTTP ${code}、リダイレクト ${redirects} 回、${seconds}s）"
+            elif [ "$code" = "403" ]; then
+              echo "::error::${name}: HTTP 403（海外 IP を拒否している可能性）"
+              failed=1
+            else
+              echo "::error::${name}: HTTP ${code}"
+              failed=1
+            fi
+          }
+
+          check "ProFinder" "$PROFINDER_URL"
+          check "ProFarm" "$PROFARM_URL"
+          exit "$failed"
