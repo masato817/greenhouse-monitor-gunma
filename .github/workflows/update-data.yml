@@ -1,54 +1,180 @@
 name: Update Greenhouse Data
 
+# 静岡事務所の24時間PC（タスクスケジューラ）と同じ間隔でスクレイプし、ダッシュボードを更新・デプロイする。
+# schedule は repository variable ACTIONS_SCRAPE_ENABLED が 'true' のときだけ動く。
+# 24時間PCのタスクと並走すると Sheets に行が二重に入り push も衝突するため、
+# 切り替え手順（docs/actions-migration.md）が済むまで止めておく。
 on:
-  # schedule:
-  #   # 10分ごとに実行 (**:00, **:10, **:20, **:30, **:40, **:50)
-  #   - cron: '*/10 * * * *'
+  schedule:
+    # cron は UTC。:00 を避けてずらしている（GitHub の混雑で遅延・欠落しやすいため）
+    # JST 06:00〜18:59（UTC 21:00〜09:59）は10分毎
+    - cron: '3,13,23,33,43,53 21-23,0-9 * * *'
+    # JST 19:00〜05:59（UTC 10:00〜20:59）は毎時
+    - cron: '7 10-20 * * *'
+  # 手動実行はガードしない（24時間PCが動いている間に実行すると Sheets に1回分の行が二重に入る点に注意）
   workflow_dispatch:
-    # 手動実行ボタンを有効化
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
 
 jobs:
-  update-data:
+  scrape:
+    # main 以外のブランチから手動実行すると、そのブランチのコードで生成したページが main に載るため main に限定する
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || vars.ACTIONS_SCRAPE_ENABLED == 'true')
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    outputs:
+      pushed: ${{ steps.publish.outputs.pushed }}
+      sha: ${{ steps.publish.outputs.sha }}
+    env:
+      TZ: Asia/Tokyo
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
-        cache: 'npm'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
 
-    - name: Install dependencies
-      run: npm install
+      - name: Cache Puppeteer browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/puppeteer
+          key: puppeteer-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
-    - name: Scrape Data and Generate HTML
-      env:
-        PROFINDER_URL: ${{ secrets.PROFINDER_URL }}
-        PROFINDER_USER: ${{ secrets.PROFINDER_USER }}
-        PROFINDER_PASS: ${{ secrets.PROFINDER_PASS }}
-        PROFARM_URL: ${{ secrets.PROFARM_URL }}
-        PROFARM_USER: ${{ secrets.PROFARM_USER }}
-        PROFARM_PASS: ${{ secrets.PROFARM_PASS }}
-        HEADLESS: true
-        # Google Sheets/LINE関連は今回は省略（必要ならSecrets追加）
-        TZ: 'Asia/Tokyo'
-      run: npm run scrape
+      - name: Install dependencies
+        run: npm ci
 
-    - name: Commit and Push changes
-      run: |
-        git config --global user.name 'github-actions[bot]'
-        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+      - name: Build
+        run: npm run build
 
-        git add public/index.html public/gunma.html
-        if git diff --cached --quiet; then
-          echo "No changes to commit (dashboard HTML unchanged)"
-        else
-          git commit -m "chore: auto-update dashboards (GitHub Actions)"
-          git push
-        fi
+      - name: Write service account key
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          # sheets.ts は keyFile 方式のため、secret の JSON を一時ファイルに書き出してパスを渡す
+          if [ -z "$GOOGLE_SERVICE_ACCOUNT_JSON" ]; then
+            echo "::warning::secret GOOGLE_SERVICE_ACCOUNT_JSON が未登録。Sheets は失敗扱いになる（ページ生成は続行）"
+            exit 0
+          fi
+          umask 077
+          printf '%s' "$GOOGLE_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/service-account.json"
+
+      - name: Scrape and generate dashboards
+        id: scrape
+        env:
+          HEADLESS: 'true'
+          PROFINDER_URL: ${{ secrets.PROFINDER_URL }}
+          PROFINDER_USER: ${{ secrets.PROFINDER_USER }}
+          PROFINDER_PASS: ${{ secrets.PROFINDER_PASS }}
+          PROFINDER_DEVICES: ${{ secrets.PROFINDER_DEVICES }}
+          PROFARM_URL: ${{ secrets.PROFARM_URL }}
+          PROFARM_USER: ${{ secrets.PROFARM_USER }}
+          PROFARM_PASS: ${{ secrets.PROFARM_PASS }}
+          PROFARM_REALTIME_URL: ${{ secrets.PROFARM_REALTIME_URL }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+          GOOGLE_SERVICE_ACCOUNT_KEY: ${{ runner.temp }}/service-account.json
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+        run: |
+          # 失敗（終了コード1）でも生成済みのページは公開するため、ここでは止めずに記録だけする
+          set +e
+          node dist/app.js --scrape
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" -ne 0 ]; then
+            echo "::error::スクレイプ処理で失敗あり (exit $code)。内容は public/status.json の failures を参照"
+          fi
+
+      - name: Remove service account key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/service-account.json"
+
+      - name: Commit and push
+        id: publish
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          files="public/index.html public/gunma.html"
+          [ -f public/status.json ] && files="$files public/status.json"
+          git add $files
+          if git diff --cached --quiet; then
+            echo "変更なし"
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git commit -q -m "chore: update dashboards (GitHub Actions)"
+
+          # 他の push と競合したら最新 main に生成物だけ載せ直して再試行する（生成物は毎回全体を書き直すため）
+          keep="$RUNNER_TEMP/generated"
+          mkdir -p "$keep"
+          for f in $files; do cp "$f" "$keep/"; done
+          for attempt in 1 2 3; do
+            if git push -q origin HEAD:main; then
+              echo "pushed=true" >> "$GITHUB_OUTPUT"
+              echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "push 失敗 (試行 $attempt)。最新 main に載せ直す"
+            sleep $((attempt * 5))
+            git fetch -q --depth=1 origin main
+            git reset -q --hard origin/main
+            for f in $files; do cp "$keep/$(basename "$f")" "$f"; done
+            git add $files
+            if git diff --cached --quiet; then
+              echo "pushed=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            git commit -q -m "chore: update dashboards (GitHub Actions)"
+          done
+          echo "::error::push に3回失敗"
+          exit 1
+
+      - name: Fail if scrape reported failures
+        if: steps.scrape.outputs.exit_code != '0'
+        run: |
+          echo "::error::スクレイプ処理の終了コードが ${{ steps.scrape.outputs.exit_code }}。ページは公開済み（取得できた分）"
+          exit 1
+
+  # GITHUB_TOKEN による push では deploy-pages.yml の push トリガが起動しないため、同じワークフロー内でデプロイする
+  deploy:
+    needs: scrape
+    if: ${{ !cancelled() && needs.scrape.outputs.pushed == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout pushed commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.scrape.outputs.sha }}
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

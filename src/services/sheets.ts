@@ -1,7 +1,7 @@
 import { google, sheets_v4 } from 'googleapis';
 import { GoogleAuth } from 'google-auth-library';
 import { EnvironmentData, WateringGuideMark, WateringGuideHistory, ThresholdConfig, ThresholdMap } from '../types';
-import { logger, getEnvOrThrow, getEnv, formatJapanese, Farm, ALL_FARMS, resolveFarm } from '../utils';
+import { logger, getEnvOrThrow, getEnv, formatJapanese, parseJstTimestamp, Farm, ALL_FARMS, resolveFarm } from '../utils';
 
 /**
  * シートのプロパティ型（簡易定義）
@@ -10,6 +10,15 @@ interface SheetProperties {
   sheetId?: number;
   title?: string;
 }
+
+/** ダッシュボード生成が使う Sheets 操作（テストでは差し替える） */
+export type DashboardSheetsPort = Pick<
+  GoogleSheetsService,
+  'getHouseConfigs' | 'saveWateringGuide' | 'getWateringGuideHistory' | 'getThresholds' | 'getRawHistoryData'
+>;
+
+/** 監視処理全体が使う Sheets 操作（テストでは差し替える） */
+export type MonitorSheetsPort = DashboardSheetsPort & Pick<GoogleSheetsService, 'saveEnvironmentData' | 'getLatestData'>;
 
 export class GoogleSheetsService {
   private auth: GoogleAuth;
@@ -250,8 +259,9 @@ export class GoogleSheetsService {
       return results;
 
     } catch (error) {
+      // 読み直しの失敗を空配列で隠すと呼び出し側が古い/欠けた表示に気づけないため、呼び出し側へ伝える
       logger.error(`Failed to get latest data from "${sheetName}": ${error} `);
-      return [];
+      throw error;
     }
   }
 
@@ -306,7 +316,7 @@ export class GoogleSheetsService {
 
     } catch (error) {
       logger.error(`Failed to get history data from "${sheetName}": ${error} `);
-      return [];
+      throw error;
     }
   }
 
@@ -325,8 +335,8 @@ export class GoogleSheetsService {
     const location = row[2];
     if (!timestampStr || !location) return null;
 
-    const timestamp = new Date(timestampStr);
-    if (isNaN(timestamp.getTime())) return null;
+    const timestamp = parseJstTimestamp(timestampStr);
+    if (!timestamp) return null;
 
     return {
       timestamp,
@@ -727,8 +737,8 @@ export class GoogleSheetsService {
       for (let i = 0; i < rows.length; i++) {
         const timestampStr = rows[i][0];
         if (!timestampStr) continue;
-        const date = new Date(timestampStr);
-        if (!isNaN(date.getTime()) && date < cutoffDate) {
+        const date = parseJstTimestamp(timestampStr);
+        if (date && date < cutoffDate) {
           deleteCount++;
         } else {
           break; // 古い順なので終了

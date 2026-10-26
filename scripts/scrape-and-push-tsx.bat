@@ -1,5 +1,7 @@
 @echo off
 REM 24h PC (task scheduler) entry: fetch+reset -> scrape -> update public -> push if changed
+REM Scrape exit code 1 means some step failed (e.g. Sheets append). Pages generated from
+REM fresh data are still pushed, then this script exits with the scrape code so the task shows failure.
 REM Assumption: this PC has git user.name/email set and can push.
 REM Assumption: this PC is scrape-only. Do not edit sources by hand (reset --hard wipes local).
 REM Set SKIP_GIT_SYNC=1 to skip fetch+reset (offline test etc).
@@ -41,21 +43,22 @@ call npm run scrape >> "%LOGFILE%" 2>&1
 set "SCRAPE_EC=!ERRORLEVEL!"
 echo ===== SCRAPE END code=!SCRAPE_EC! =====>> "%LOGFILE%"
 if not "!SCRAPE_EC!"=="0" (
-  echo Scrape failed, skip git push. Log: %LOGFILE%
-  exit /b 1
+  echo Scrape reported failures code=!SCRAPE_EC!. Publishing generated files anyway. See public/status.json and combined.log.>> "%LOGFILE%"
+  echo Scrape reported failures code=!SCRAPE_EC!. Log: %LOGFILE%
 )
 
 echo ----- git status public ----- >> "%LOGFILE%"
 git status --short public >> "%LOGFILE%" 2>&1
 
 git add public/index.html public/gunma.html >> "%LOGFILE%" 2>&1
+if exist public\status.json git add public/status.json >> "%LOGFILE%" 2>&1
 git diff --cached --quiet
 set "DIFF_EC=!ERRORLEVEL!"
 REM git diff --cached --quiet: no diff=0 / has diff=1
 if "!DIFF_EC!"=="0" (
-  echo No staged diff for index.html or gunma.html. Nothing to push.>> "%LOGFILE%"
-  echo Hint: If dashboards were skipped, check combined.log for 0 rows or Sheets errors.>> "%LOGFILE%"
-  exit /b 0
+  echo No staged diff for dashboards or status.json. Nothing to push.>> "%LOGFILE%"
+  echo Hint: If dashboards were skipped, check public/status.json and combined.log.>> "%LOGFILE%"
+  exit /b !SCRAPE_EC!
 )
 
 echo ===== GIT COMMIT/PUSH =====>> "%LOGFILE%"
@@ -73,4 +76,4 @@ if not "!PUSH_EC!"=="0" (
 )
 git log -1 --oneline >> "%LOGFILE%" 2>&1
 echo ===== PUSH OK =====>> "%LOGFILE%"
-exit /b 0
+exit /b !SCRAPE_EC!

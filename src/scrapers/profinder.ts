@@ -18,6 +18,7 @@ function parseProfinderDevices(): { id: string; name: string }[] {
 export class ProfinderScraper extends BaseScraper {
   async scrape(): Promise<EnvironmentData[]> {
     const results: EnvironmentData[] = [];
+    this.lastError = null;
 
     try {
       await this.initialize();
@@ -51,6 +52,7 @@ export class ProfinderScraper extends BaseScraper {
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           this.logger.error(`Failed to scrape ${device.name}: ${msg}`);
+          this.recordError(`${device.name}: ${msg}`);
           await this.takeScreenshot(`error-profinder-${device.id}`);
         }
       }
@@ -58,6 +60,7 @@ export class ProfinderScraper extends BaseScraper {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       this.logger.error(`Profinder scraping fatal error: ${msg}`);
+      this.recordError(msg);
       await this.takeScreenshot('fatal-error-profinder');
     } finally {
       await this.close();
@@ -70,7 +73,7 @@ export class ProfinderScraper extends BaseScraper {
     if (!this.page) return;
 
     this.logger.info('Logging in to Profinder...');
-    await this.page.goto(this.config.url, { waitUntil: 'domcontentloaded' });
+    await this.gotoChecked(this.config.url, 'Profinder login');
 
     const userSelector = '#usid';
     const passSelector = '#pswd';
@@ -85,8 +88,20 @@ export class ProfinderScraper extends BaseScraper {
       await this.page.click(loginButtonSelector);
       this.logger.info('Login submitted, waiting...');
 
-      // Explicit wait instead of waitForNavigation because of SPA behavior potential
-      await new Promise(r => setTimeout(r, 10000));
+      // ログイン成功の検証: SPA のため waitForNavigation は使えないので、
+      // ダッシュボードのデバイス選択要素が現れることをもって成功と判定する
+      try {
+        await this.page.waitForSelector('#select-device', { timeout: 20000 });
+        this.logger.info('Login success confirmed (#select-device found)');
+      } catch {
+        const stillOnLogin = await this.page.$(userSelector);
+        await this.takeScreenshot('login-failed-profinder');
+        throw new Error(
+          stillOnLogin
+            ? 'Profinder ログイン失敗: ログインフォームが残存（認証エラーの可能性）'
+            : 'Profinder ログイン失敗: ダッシュボードが表示されませんでした'
+        );
+      }
 
     } catch (e) {
       this.logger.error(`Profinder Login failed: ${e}`);

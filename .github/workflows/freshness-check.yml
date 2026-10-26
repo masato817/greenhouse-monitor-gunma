@@ -1,0 +1,107 @@
+name: Freshness Check
+
+# ダッシュボードのデータ更新が止まっていないかを定期的に確かめる。
+# 止まっていたらジョブを失敗させ、GitHub の失敗通知（メール）に乗せる。
+# 実行役（24時間PC / GitHub Actions）に関係なく、main の public/status.json を見る。
+on:
+  schedule:
+    # 30分毎（cron は UTC。:00 を避けてずらしている）
+    - cron: '17,47 * * * *'
+  workflow_dispatch:
+    inputs:
+      max_age_hours:
+        description: '何時間止まっていたら失敗にするか（空なら変数 FRESHNESS_MAX_AGE_HOURS、未設定なら 3）'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: freshness-check
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      MAX_AGE_HOURS: ${{ inputs.max_age_hours || vars.FRESHNESS_MAX_AGE_HOURS || '3' }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout status.json
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          sparse-checkout: |
+            public/status.json
+          sparse-checkout-cone-mode: false
+
+      - name: Check data freshness
+        run: |
+          set -euo pipefail
+
+          if ! max_min=$(awk -v h="$MAX_AGE_HOURS" 'BEGIN { if (h + 0 <= 0) exit 1; printf "%d", h * 60 }'); then
+            echo "::error::MAX_AGE_HOURS が不正: $MAX_AGE_HOURS"
+            exit 1
+          fi
+          now=$(date -u +%s)
+          age_min() { echo $(( (now - $(date -u -d "$1" +%s)) / 60 )); }
+          fmt() { TZ=Asia/Tokyo date -d "$1" '+%Y-%m-%d %H:%M JST'; }
+          failed=0
+          status=public/status.json
+
+          data_time=""
+          basis=""
+          if [ -f "$status" ]; then
+            data_time=$(jq -r '.dataUpdatedAt // empty' "$status")
+            basis="status.json の dataUpdatedAt"
+          fi
+          if [ -z "$data_time" ]; then
+            # status.json 導入前・取得成功の記録が無い場合: ダッシュボードの最終更新コミットで判定する
+            data_time=$(for f in public/index.html public/gunma.html; do
+              gh api "repos/$GITHUB_REPOSITORY/commits?path=$f&sha=main&per_page=1" --jq '.[0].commit.committer.date // empty'
+            done | sort -r | head -n 1)
+            basis="ダッシュボードの最終更新コミット"
+          fi
+          if [ -z "$data_time" ]; then
+            echo "::error::データ時刻を判定できない（status.json もコミット履歴も見つからない）"
+            exit 1
+          fi
+
+          age=$(age_min "$data_time")
+          echo "データ時刻: $(fmt "$data_time")（${basis}、${age}分前）/ 閾値 ${MAX_AGE_HOURS}時間"
+          if [ "$age" -gt "$max_min" ]; then
+            echo "::error::ダッシュボードのデータ更新が ${age}分 止まっている（閾値 ${MAX_AGE_HOURS}時間、基準: ${basis}）"
+            failed=1
+          fi
+
+          if [ -f "$status" ]; then
+            echo "status.json 生成: $(fmt "$(jq -r '.generatedAt' "$status")")"
+
+            # Sheets 追記の連続失敗（2026-05 の停止原因）も閾値を超えたら失敗にする
+            since=$(jq -r '.sheets.appendFailingSince // empty' "$status")
+            if [ -n "$since" ]; then
+              append_error=$(jq -r '.sheets.append.error // "不明"' "$status")
+              if [ "$(age_min "$since")" -gt "$max_min" ]; then
+                echo "::error::Sheets への追記が $(fmt "$since") から失敗し続けている: ${append_error}"
+                failed=1
+              else
+                echo "::warning::Sheets への追記が $(fmt "$since") から失敗中: ${append_error}"
+              fi
+            fi
+
+            # ソース別: 一部ソースの停止は公開を続けるため警告に留める
+            while IFS=$'\x1f' read -r key last err; do
+              if [ -z "$last" ]; then
+                echo "::warning::${key}: 取得成功の記録なし ${err}"
+              elif [ "$(age_min "$last")" -gt "$max_min" ]; then
+                echo "::warning::${key}: $(fmt "$last") から取得できていない ${err}"
+              else
+                echo "${key}: 最終取得成功 $(fmt "$last")"
+              fi
+            done < <(jq -r '.sources | to_entries[] | select(.value.enabled)
+              | [.key, (.value.lastSuccessAt // ""), (.value.lastError // "")] | join("\u001f")' "$status")
+          fi
+
+          exit "$failed"

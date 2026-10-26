@@ -6,14 +6,20 @@ export class LineMessagingService {
   private userId: string;
 
   constructor() {
-    this.channelAccessToken = getEnv('LINE_CHANNEL_ACCESS_TOKEN', '');
-    this.userId = getEnv('LINE_USER_ID', '');
+    // 前後の改行・空白（CRLF の \r や貼り付け時の余白）が残ると Authorization ヘッダが
+    // 「Invalid character in header content」で拒否され、通知が一度も届かなくなるため除去する
+    this.channelAccessToken = getEnv('LINE_CHANNEL_ACCESS_TOKEN', '').trim();
+    this.userId = getEnv('LINE_USER_ID', '').trim();
   }
 
-  async send(text: string): Promise<void> {
+  /**
+   * テキストをプッシュ送信する。失敗しても例外は投げない
+   * @returns 送信できたら true（未設定・失敗は false）
+   */
+  async send(text: string): Promise<boolean> {
     if (!this.channelAccessToken || !this.userId) {
       logger.warn('LINE credential (Token or UserID) not set. Skipping notification.');
-      return;
+      return false;
     }
 
     try {
@@ -37,6 +43,7 @@ export class LineMessagingService {
 
       await axios.post(url, data, { headers });
       logger.info('LINE message sent successfully.');
+      return true;
 
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -44,6 +51,7 @@ export class LineMessagingService {
       if (axios.isAxiosError(error) && error.response) {
         logger.error(`LINE API Response: ${JSON.stringify(error.response.data)}`);
       }
+      return false;
     }
   }
 

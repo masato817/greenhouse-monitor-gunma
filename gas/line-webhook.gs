@@ -5,33 +5,48 @@
  * 1. Google Apps Scriptで新規プロジェクトを作成
  * 2. このコードを貼り付け
  * 3. CHANNEL_ACCESS_TOKENを設定
- * 4. 「デプロイ」→「新しいデプロイ」→「ウェブアプリ」として公開
- * 5. 公開されたURLをLINE DevelopersのWebhook URLに設定
- * 6. LINE公式アカウントを友だち追加 or グループに招待
- * 7. スプレッドシートにIDが記録される
+ * 4. WEBHOOK_TOKENを推測困難なランダム文字列に変更（必須）
+ * 5. 「デプロイ」→「新しいデプロイ」→「ウェブアプリ」として公開
+ * 6. 公開されたURLに ?token=<WEBHOOK_TOKENの値> を付けて
+ *    LINE DevelopersのWebhook URLに設定
+ *    例: https://script.google.com/macros/s/xxx/exec?token=ランダム文字列
+ * 7. LINE公式アカウントを友だち追加 or グループに招待
+ * 8. スプレッドシートにIDが記録される
  */
 
 // 設定
 const CHANNEL_ACCESS_TOKEN = 'YOUR_CHANNEL_ACCESS_TOKEN'; // ← ここを変更
 const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID'; // ← 記録用スプレッドシートID（任意）
+const WEBHOOK_TOKEN = 'YOUR_WEBHOOK_TOKEN'; // ← 推測困難なランダム文字列に変更（必須）
 
 /**
  * Webhookエンドポイント
  */
 function doPost(e) {
+  // GAS の doPost は HTTP ヘッダを参照できず X-Line-Signature の HMAC 検証が
+  // 実装不可能なため、代替として URL クエリトークンで送信元を制限する。
+  // トークン未設定時も全リクエストを拒否する（fail close）。
+  const token = e && e.parameter ? e.parameter.token : '';
+  if (WEBHOOK_TOKEN === 'YOUR_WEBHOOK_TOKEN' || !token || token !== WEBHOOK_TOKEN) {
+    console.error('Unauthorized webhook request');
+    return ContentService.createTextOutput(JSON.stringify({ status: 'unauthorized' }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   try {
     const events = JSON.parse(e.postData.contents).events;
-    
+
     events.forEach(event => {
       logEvent(event);
     });
-    
+
     return ContentService.createTextOutput(JSON.stringify({ status: 'ok' }))
       .setMimeType(ContentService.MimeType.JSON);
-      
+
   } catch (error) {
     console.error('Error:', error);
-    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: error.message }))
+    // 内部情報の漏えい防止のため、詳細はGASログのみに残し固定文言を返す
+    return ContentService.createTextOutput(JSON.stringify({ status: 'error' }))
       .setMimeType(ContentService.MimeType.JSON);
   }
 }
